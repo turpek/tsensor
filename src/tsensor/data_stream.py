@@ -7,8 +7,8 @@ class DataStream:
     def __init__(self, total_samples: int):
         self._total_count = 0
         self._total_samples = total_samples
-        self._data: deque[float] = deque()
-        self._moving_sum = 0
+        self._data: deque[tuple[str, float]] = deque()
+        self._moving_sum = 0.0
         self._moving_average = 0.0
         self._mean = 0.0
         self._max = -float('inf')
@@ -46,8 +46,8 @@ class DataStream:
             self,
             decimal_label: int,
             width: float,
-            bins: float,
-            min_bins: float,
+            bins: int,
+            min_bins: int,
     ):
         w_art = 10 ** (-decimal_label)
         if width > w_art:
@@ -61,7 +61,7 @@ class DataStream:
     def add(self, data: float) -> None:
         self._maintain_window()
         timestamp = self._timestamp()
-        self._data.append([timestamp, data])
+        self._data.append((timestamp, data))
         self._update_stats(data)
 
     def histogram(
@@ -78,7 +78,7 @@ class DataStream:
         k = max(k, min_bins)
         h = self.amplitude / k
 
-        labels_list = self._get_labels(decimal_label, h, k, min_bins)
+        labels_list = self._get_labels(decimal_label, h, int(k), min_bins)
         histogram = {label: 0 for label in labels_list}
 
         for _, data in self.sample:
