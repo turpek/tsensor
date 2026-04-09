@@ -9,6 +9,7 @@ class DataStream:
         self._total_samples = total_samples
         self._data: deque[float] = deque()
         self._moving_sum = 0
+        self._moving_average = 0.0
         self._mean = 0.0
         self._max = -float('inf')
         self._min = float('inf')
@@ -33,14 +34,15 @@ class DataStream:
             _, oldest = self._data.popleft()
             self._moving_sum -= oldest
 
+        timestamp = self._timestamp()
+        self._data.append([timestamp, data])
         self._total_count += 1
         self._moving_sum += data
         self._update_shift_and_mean(data)
         self._max = max(data, self._max)
         self._min = min(data, self._min)
 
-        timestamp = self._timestamp()
-        self._data.append([timestamp, data])
+        self._moving_average = self._moving_sum / len(self)
 
     def histogram(
         self,
@@ -49,17 +51,25 @@ class DataStream:
         max_bins: int = 30,
     ) -> dict[str, int]:
 
-        if self.amplitude == 0:
-            return {f'{self.min:.{decimal_label}f}': len(self)}
+        # if self.amplitude == 0:
+        #     return {f'{self.min:.{decimal_label}f}': len(self)}
 
         k = min(int(sqrt(len(self))), max_bins)
         k = max(k, min_bins)
         h = self.amplitude / k
 
-        labels_list = [
-            f'{(self.min + i * h):.{decimal_label}f}' for i in range(k)
-        ]
+        if h > 10**(-decimal_label):
+            labels_list = [
+                f'{(self.min + i * h):.{decimal_label}f}' for i in range(k)
+            ]
+        else:
+            h_art = 10 ** (-decimal_label)
+            left_offset = min_bins // 2
+            start_val = self.min - (left_offset * h_art)
+            labels_list = [f'{(start_val + i * h_art):.{decimal_label}f}' for i in range(min_bins)]
+
         histogram = {label: 0 for label in labels_list}
+
         for _, data in self.sample:
             idx = max(0, floor((data - self.min) / h))
             if idx >= k:

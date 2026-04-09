@@ -96,6 +96,42 @@ def test_datastream_histogram_decimal_customizado():
     assert label_inicial == "20.12"
 
 
+def test_datastream_histogram_colisao_labels():
+    # Setup: Janela pequena onde os labels vao colidir se decimal_label=0
+    # xmin=25.0, xmax=25.5, k=5, h=0.1
+    # Labels sem decimal: "25", "25", "25", "25", "25"
+    stream = DataStream(total_samples=10)
+    stream.add(25.0)
+    stream.add(25.5)
+
+    # Se o bug existe, o dicionario tera menos que 5 itens
+    hist = stream.histogram(decimal_label=0)
+    assert len(hist) == 5  # Isso deve falhar
+
+
+def test_datastream_histogram_garante_min_bins_balanceado():
+    """
+    Valida se o histograma retorna ao menos min_bins elementos únicos
+    mesmo quando a precisão solicitada (decimal_label) causaria colisões.
+    """
+
+    stream = DataStream(total_samples=100)
+    # Amplitude pequena: 0.04
+    stream.add(25.00)
+    stream.add(25.04)
+
+    min_bins = 5
+    # Se k=5, h=0.008. Com decimal_label=1, os labels colidiriam em "25.0"
+    hist = stream.histogram(min_bins=min_bins, decimal_label=1)
+
+    assert len(hist) >= min_bins, (
+        f"Esperado ao menos {min_bins} bins, obtido {len(hist)}"
+    )
+
+    labels = sorted(hist.keys())
+    assert len(set(labels)) == len(labels), "Labels duplicados detectados no histograma"
+
+
 def test_datastream_histogram_amostras_iguais():
     # Cenário onde amplitude é 0. O sistema deve tratar sem divisão por zero.
     stream = DataStream(total_samples=10)
