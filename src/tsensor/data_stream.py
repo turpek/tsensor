@@ -42,12 +42,6 @@ class DataStream:
             _, oldest = self._data.popleft()
             self._moving_sum -= oldest
 
-    def add(self, data: float) -> None:
-        self._maintain_window()
-        timestamp = self._timestamp()
-        self._data.append([timestamp, data])
-        self._update_stats(data)
-
     def _get_labels(
             self,
             decimal_label: int,
@@ -63,6 +57,12 @@ class DataStream:
         left_offset = min_bins // 2
         start_val = self.min - (left_offset * w_art)
         return [f'{(start_val + i * w_art):.{decimal_label}f}' for i in range(min_bins)]
+
+    def add(self, data: float) -> None:
+        self._maintain_window()
+        timestamp = self._timestamp()
+        self._data.append([timestamp, data])
+        self._update_stats(data)
 
     def histogram(
         self,
