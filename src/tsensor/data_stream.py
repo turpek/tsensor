@@ -23,26 +23,46 @@ class DataStream:
     def _timestamp(self) -> str:
         return datetime.now().strftime("%H:%M:%S:%f")[:-3]
 
-    def _update_shift_and_mean(self, data) -> None:
+    def _update_shift_and_mean(self, data: float) -> None:
         self.__old_shift = data - self._mean
         self._mean += self.__old_shift / self._total_count
         self.__new_shift = data - self.mean
         self.__m2 += self.__new_shift * self.__old_shift
 
-    def add(self, data: float) -> None:
+    def _update_stats(self, data: float) -> None:
+        self._moving_sum += data
+        self._total_count += 1
+        self._update_shift_and_mean(data)
+        self._max = max(data, self._max)
+        self._min = min(data, self._min)
+        self._moving_average = self._moving_sum / len(self)
+
+    def _maintain_window(self) -> None:
         if self._total_samples == len(self):
             _, oldest = self._data.popleft()
             self._moving_sum -= oldest
 
+    def add(self, data: float) -> None:
+        self._maintain_window()
         timestamp = self._timestamp()
         self._data.append([timestamp, data])
-        self._total_count += 1
-        self._moving_sum += data
-        self._update_shift_and_mean(data)
-        self._max = max(data, self._max)
-        self._min = min(data, self._min)
+        self._update_stats(data)
 
-        self._moving_average = self._moving_sum / len(self)
+    def _get_labels(
+            self,
+            decimal_label: int,
+            width: float,
+            bins: float,
+            min_bins: float,
+    ):
+        w_art = 10 ** (-decimal_label)
+        if width > w_art:
+            return [
+                f'{(self.min + i * width):.{decimal_label}f}' for i in range(bins)
+            ]
+        left_offset = min_bins // 2
+        start_val = self.min - (left_offset * w_art)
+        return [f'{(start_val + i * w_art):.{decimal_label}f}' for i in range(min_bins)]
 
     def histogram(
         self,
@@ -51,23 +71,14 @@ class DataStream:
         max_bins: int = 30,
     ) -> dict[str, int]:
 
-        # if self.amplitude == 0:
-        #     return {f'{self.min:.{decimal_label}f}': len(self)}
+        if self.amplitude == 0:
+            return {f'{self.min:.{decimal_label}f}': len(self)}
 
         k = min(int(sqrt(len(self))), max_bins)
         k = max(k, min_bins)
         h = self.amplitude / k
 
-        if h > 10**(-decimal_label):
-            labels_list = [
-                f'{(self.min + i * h):.{decimal_label}f}' for i in range(k)
-            ]
-        else:
-            h_art = 10 ** (-decimal_label)
-            left_offset = min_bins // 2
-            start_val = self.min - (left_offset * h_art)
-            labels_list = [f'{(start_val + i * h_art):.{decimal_label}f}' for i in range(min_bins)]
-
+        labels_list = self._get_labels(decimal_label, h, k, min_bins)
         histogram = {label: 0 for label in labels_list}
 
         for _, data in self.sample:
