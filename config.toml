@@ -1,0 +1,22 @@
+# Configurações do Sistema de Monitoramento de Temperatura (tsensor)
+
+[hardware]
+port = "/dev/ttyACM1"
+baudrate = 115200
+timeout = 1.0
+
+[sensor]
+type = "LM35"         # Opções: "LM35" ou "NTC"
+adc_max = 1023        # 1023 (10-bit) ou 4095 (12-bit)
+v_ref = 1.1           # Tensão de referência em Volts
+resolution_c = 0.1074 # Resolução térmica em ºC (ADC step / sensitivity)
+
+[acquisition]
+total_samples = 1000000
+buffer_samples = 1000       # Amostras para o gráfico de linha (tempo real)
+max_runtime_sec = 1800      # Tempo limite de coleta (30 minutos)
+
+[presentation]
+decimal_places = 1
+flask_port = 5000
+debug_mode = true

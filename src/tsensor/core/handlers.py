@@ -9,12 +9,10 @@ from tsensor.core.utils import timestamp
 class SerialHandler(Protocol):
     """Qualquer classe com esses método será considerada um SerialParser"""
 
-    def handle(self, line: str) -> None:
-        ...
+    def handle(self, line: str) -> None: ...
 
     @property
-    def is_active(self) -> bool:
-        ...
+    def is_active(self) -> bool: ...
 
     @property
     def data(self) -> DataStream:
@@ -22,7 +20,6 @@ class SerialHandler(Protocol):
 
 
 class NTCHandler:
-
     def __init__(
         self,
         data: DataStream,
@@ -69,7 +66,7 @@ class NTCHandler:
         if adc is not None and self._check_adc(adc):
             temperature = self._convert(adc)
             time_now = timestamp()
-            logger.debug(f'temperatura: {temperature:.4f}')
+            logger.debug(f"temperatura: {temperature:.4f}")
             self._data.add(temperature, time_now)
             self._temporal_data.add(temperature, time_now)
 
@@ -91,7 +88,6 @@ class NTCHandler:
 
 
 class LM35Handler:
-
     def __init__(
         self,
         data: DataStream,
@@ -129,7 +125,7 @@ class LM35Handler:
         if adc is not None and self._check_adc(adc):
             temperature = self._convert(adc)
             time_now = timestamp()
-            logger.debug(f'temperatura: {temperature:.4f}')
+            logger.debug(f"temperatura: {temperature:.4f}")
             self._data.add(temperature, time_now)
             self._temporal_data.add(temperature, time_now)
 
