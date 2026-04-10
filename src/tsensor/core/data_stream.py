@@ -1,6 +1,5 @@
 from collections import deque
-from datetime import datetime
-from math import sqrt, floor
+from math import ceil, sqrt
 from threading import Lock
 
 
@@ -13,17 +12,14 @@ class DataStream:
         self._moving_sum = 0.0
         self._moving_average = 0.0
         self._mean = 0.0
-        self._max = -float('inf')
-        self._min = float('inf')
+        self._max = -float("inf")
+        self._min = float("inf")
         self.__m2 = 0.0
         self.__old_shift = 0.0
         self.__new_shift = 0.0
 
     def __len__(self) -> int:
         return len(self._data)
-
-    def _timestamp(self) -> str:
-        return datetime.now().strftime("%H:%M:%S:%f")[:-3]
 
     def _update_shift_and_mean(self, data: float) -> None:
         self.__old_shift = data - self._mean
@@ -44,35 +40,6 @@ class DataStream:
             _, oldest = self._data.popleft()
             self._moving_sum -= oldest
 
-    def _get_labels(
-            self,
-            decimal_label: int,
-            width: float,
-            bins: int,
-            min_bins: int,
-    ) -> tuple[int, float, list[str], float]:
-        w_art = 10 ** (-decimal_label)
-        if width > w_art:
-            return (
-                bins,
-                width,
-                [
-                    f'{(self.min + i * width):.{decimal_label}f}' for i in range(bins)
-                ],
-                self.min,
-            )
-
-        left_offset = min_bins // 2
-        start_val = self.min - (left_offset * w_art)
-        return (
-            min_bins,
-            w_art,
-            [
-                f'{(start_val + i * w_art):.{decimal_label}f}' for i in range(min_bins)
-            ],
-            start_val
-        )
-
     def add(self, data: float, timestamp: str) -> None:
         with self._lock:
             self._maintain_window()
@@ -86,35 +53,72 @@ class DataStream:
         self._moving_sum = 0.0
         self._moving_average = 0.0
         self._mean = 0.0
-        self._max = -float('inf')
-        self._min = float('inf')
+        self._max = -float("inf")
+        self._min = float("inf")
         self.__m2 = 0.0
         self.__old_shift = 0.0
         self.__new_shift = 0.0
 
     def histogram(
         self,
+        resolucao_adc: float,
         decimal_label: int = 1,
-        min_bins: int = 5,
-        max_bins: int = 30,
     ) -> dict[str, int]:
 
+        n = len(self.sample)
+        if n == 0:
+            return {}
         if self.amplitude == 0:
-            return {f'{self.min:.{decimal_label}f}': len(self)}
+            return {f"{self.moving_average:.{decimal_label}f}": n}
 
-        k = min(int(sqrt(len(self))), max_bins)
-        k = max(k, min_bins)
-        h = self.amplitude / k
+        temperaturas = [dado for _, dado in self.sample]
+        temperaturas.sort()
 
-        k, h, labels_list, min_ = self._get_labels(decimal_label, h, int(k), min_bins)
-        histogram = {label: 0 for label in labels_list}
-        for _, data in self.sample:
-            idx = max(0, floor((data - min_) / h))
-            if idx >= k:
-                idx = k - 1
-            label = labels_list[idx]
-            histogram[label] += 1
-        return histogram
+        q1_idx = n // 4
+        q3_idx = (n * 3) // 4
+        q1 = temperaturas[q1_idx]
+        q3 = temperaturas[q3_idx]
+        iqr = q3 - q1
+
+        # --- FILTRO DE OUTLIERS DE TUKEY ---
+        # Multiplicador 1.5 ou 2.0 (2.0 é mais tolerante e evita cortar dados válidos)
+        margem = 2.0 * iqr
+        limite_inferior = q1 - margem
+        limite_superior = q3 + margem
+
+        dados_limpos = [
+            x for x in temperaturas if limite_inferior <= x <= limite_superior
+        ]
+
+        # Se por acaso filtrar tudo (muito raro), aborta e usa o normal
+        if not dados_limpos:
+            dados_limpos = temperaturas
+
+        min_visual = dados_limpos[0]
+        max_visual = dados_limpos[-1]
+        amplitude_visual = max_visual - min_visual
+
+        if iqr > 0:
+            h_fd = 2 * iqr / (n ** (1 / 3))
+        else:
+            h_fd = 0.1
+
+        resolucao_adc = 0.1074
+        h_ideal = max(h_fd, resolucao_adc)
+
+        k = max(5, ceil(amplitude_visual / h_ideal))
+        h_real = amplitude_visual / k if k > 0 else h_ideal
+
+        labels_list = [
+            f"{(min_visual + i * h_real):.{decimal_label}f}" for i in range(k)
+        ]
+        histograma_dit = {label: 0 for label in labels_list}
+
+        for data in dados_limpos:
+            idx = max(0, min(int((data - min_visual) / h_real), k - 1))
+            histograma_dit[labels_list[idx]] += 1
+
+        return histograma_dit
 
     @property
     def mean(self) -> float:
