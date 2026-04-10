@@ -20,7 +20,7 @@ class DataStream:
         self.__new_shift = 0.0
 
     def __len__(self) -> int:
-        return len(self.sample)
+        return len(self._data)
 
     def _timestamp(self) -> str:
         return datetime.now().strftime("%H:%M:%S:%f")[:-3]
