@@ -1,4 +1,3 @@
-import pytest
 from tsensor.core.serial_reader import serial_reading
 
 
