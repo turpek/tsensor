@@ -17,6 +17,7 @@ buffer_samples = 1000       # Amostras para o gráfico de linha (tempo real)
 max_runtime_sec = 1800      # Tempo limite de coleta (30 minutos)
 
 [presentation]
+log_level = "INFO"   # Opções: "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR"
 decimal_places = 1
 flask_port = 5000
 debug_mode = true

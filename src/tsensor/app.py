@@ -1,5 +1,6 @@
 import threading
 import os
+import sys
 from flask import Flask
 from loguru import logger
 from tsensor.routes.home import home_route
@@ -11,6 +12,10 @@ from tsensor.core.utils import load_config
 
 # Carrega a configuração global
 config = load_config()
+
+# Configura o loguru dinamicamente conforme o TOML
+logger.remove()
+logger.add(sys.stderr, level=config["presentation"]["log_level"])
 
 app = Flask(__name__)
 app.secret_key = "SUA_CHAVE_SECRETA"

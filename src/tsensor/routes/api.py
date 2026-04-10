@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, jsonify
-from tsensor.extensions import data_stream
+from tsensor.extensions import data_stream, config
 
 api_route = Blueprint("api", __name__, url_prefix="/api")
 
@@ -18,8 +18,11 @@ def get_stats():
 
 @api_route.route("/histogram", methods=["GET"])
 def get_histogram():
-    print(f">> size: {len(data_stream)}\n\n")
-    hist_dict = data_stream.histogram(1.1 / 1024, decimal_label=1)
+    # Usa os valores dinâmicos do TOML
+    res_adc = config["sensor"]["v_ref"] / config["sensor"]["adc_max"]
+    decimals = config["presentation"]["decimal_places"]
+
+    hist_dict = data_stream.histogram(res_adc, decimal_label=decimals)
 
     response_data = {
         "labels": list(hist_dict.keys()),
