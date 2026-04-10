@@ -70,7 +70,7 @@ class DataStream:
             [
                 f'{(start_val + i * w_art):.{decimal_label}f}' for i in range(min_bins)
             ],
-            left_offset
+            start_val
         )
 
     def add(self, data: float) -> None:
@@ -96,8 +96,7 @@ class DataStream:
 
         k, h, labels_list, min_ = self._get_labels(decimal_label, h, int(k), min_bins)
         histogram = {label: 0 for label in labels_list}
-        samples_snapshot = list(self.sample)
-        for _, data in samples_snapshot:
+        for _, data in self.sample:
             idx = max(0, floor((data - min_) / h))
             if idx >= k:
                 idx = k - 1
