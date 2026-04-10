@@ -15,7 +15,7 @@ app.register_blueprint(api_route)
 
 
 def serial_acquisition():
-    handler = LM35Handler(data_stream, buffer_stream, 1_000_000, 1800)
+    handler = LM35Handler(data_stream, buffer_stream, 1_000_000, 1800, 1023, 1.1)
 
     logger.info("Iniciando leitura serial simulada...")
     serial_reading(
