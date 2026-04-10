@@ -5,7 +5,7 @@ from loguru import logger
 from tsensor.routes.home import home_route
 from tsensor.routes.api import api_route
 from tsensor.extensions import data_stream, buffer_stream
-from tsensor.core.handlers import LM35Handler, NTCHandler
+from tsensor.core.handlers import HANDLERS
 from tsensor.core.serial_reader import serial_reading
 from tsensor.core.utils import load_config
 
@@ -20,25 +20,22 @@ app.register_blueprint(api_route)
 
 
 def serial_acquisition():
-    # Inicializa o handler conforme o tipo do sensor no TOML
+    # Inicializa o handler dinamicamente via dicionário HANDLERS
     sensor_type = config["sensor"]["type"]
 
-    params = {
-        "data": data_stream,
-        "temporal_data": buffer_stream,
-        "samples": config["acquisition"]["total_samples"],
-        "timeout": config["acquisition"]["max_runtime_sec"],
-        "adc_max": config["sensor"]["adc_max"],
-        "v_ref": config["sensor"]["v_ref"],
-    }
-
-    if sensor_type == "LM35":
-        handler = LM35Handler(**params)
-    elif sensor_type == "NTC":
-        handler = NTCHandler(**params)
-    else:
+    if sensor_type not in HANDLERS:
         logger.error(f"Tipo de sensor desconhecido: {sensor_type}")
         return
+
+    handler_cls = HANDLERS[sensor_type]
+    handler = handler_cls(
+        data=data_stream,
+        temporal_data=buffer_stream,
+        samples=config["acquisition"]["total_samples"],
+        timeout=config["acquisition"]["max_runtime_sec"],
+        adc_max=config["sensor"]["adc_max"],
+        v_ref=config["sensor"]["v_ref"],
+    )
 
     logger.info(f"Iniciando coleta serial para sensor {sensor_type}...")
     serial_reading(

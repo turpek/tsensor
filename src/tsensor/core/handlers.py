@@ -144,3 +144,10 @@ class LM35Handler:
     @property
     def data(self) -> DataStream:
         return self._data
+
+
+# Mapeamento global de handlers disponíveis para configuração via TOML
+HANDLERS = {
+    "LM35": LM35Handler,
+    "NTC": NTCHandler,
+}
