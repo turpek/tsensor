@@ -73,10 +73,9 @@ class DataStream:
             start_val
         )
 
-    def add(self, data: float) -> None:
+    def add(self, data: float, timestamp: str) -> None:
         with self._lock:
             self._maintain_window()
-            timestamp = self._timestamp()
             self._data.append((timestamp, data))
             self._update_stats(data)
 

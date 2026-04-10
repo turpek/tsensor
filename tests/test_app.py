@@ -26,7 +26,7 @@ def test_api_stats_returns_html_partial_with_mocked_values(client, mocker):
     # 1. Setup local do Mock
     test_stream = DataStream(total_samples=5)
     for val in [10.0, 20.0, 30.0, 40.0, 50.0]:
-        test_stream.add(val)
+        test_stream.add(val, timestamp="10:00:00:000")
 
     # 2. Patch usando o mocker do pytest
     mocker.patch("tsensor.routes.api.data_stream", test_stream)
@@ -52,7 +52,7 @@ def test_api_histogram_returns_json_with_mocked_values(client, mocker):
     # 1. Setup local do Mock
     test_stream = DataStream(total_samples=5)
     for val in [10.0, 20.0, 30.0, 40.0, 50.0]:
-        test_stream.add(val)
+        test_stream.add(val, timestamp="10:00:00:000")
 
     # 2. Patch usando o mocker do pytest
     mocker.patch("tsensor.routes.api.data_stream", test_stream)

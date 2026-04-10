@@ -3,6 +3,7 @@ from math import log
 from time import time
 from typing import Protocol
 from tsensor.core.data_stream import DataStream
+from tsensor.core.utils import timestamp
 
 
 class SerialHandler(Protocol):
@@ -59,8 +60,9 @@ class NTCHandler:
         adc = self._str_to_int(line)
         if adc is not None and self._check_adc(adc):
             temperature = self._convert(adc)
-            self._data.add(temperature)
-            self._temporal_data.add(temperature)
+            time_now = timestamp()
+            self._data.add(temperature, time_now)
+            self._temporal_data.add(temperature, time_now)
 
     @property
     def is_active(self) -> bool:
