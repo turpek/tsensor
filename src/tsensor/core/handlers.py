@@ -16,6 +16,10 @@ class SerialHandler(Protocol):
     def is_active(self) -> bool:
         ...
 
+    @property
+    def data(self) -> DataStream:
+        return self._data
+
 
 class NTCHandler:
 
