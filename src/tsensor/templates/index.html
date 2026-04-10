@@ -72,10 +72,15 @@
                     const ctx = document.getElementById('histogramChart').getContext('2d');
 
                     if (chartInstance) {
-                        chartInstance.destroy();
+                        // Atualiza apenas os dados e labels para manter a transição suave
+                        chartInstance.data.labels = data.labels;
+                        chartInstance.data.datasets[0].data = data.values;
+                        chartInstance.update('none'); // 'none' desabilita animação de reconstrução, mantendo apenas o ajuste
+                        return;
                     }
 
                     chartInstance = new Chart(ctx, {
+
                         type: 'bar',
                         data: {
                             labels: data.labels,
