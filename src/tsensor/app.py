@@ -10,7 +10,6 @@ from tsensor.core.handlers import HANDLERS
 from tsensor.core.serial_reader import serial_reading
 from tsensor.core.utils import load_config
 
-# Carrega a configuração global
 config = load_config()
 
 # Configura o loguru dinamicamente conforme o TOML
@@ -42,7 +41,9 @@ def serial_acquisition():
         v_ref=config["sensor"]["v_ref"],
     )
 
-    logger.info(f"Iniciando coleta serial para sensor {sensor_type}...")
+    logger.info(
+        f"Iniciando coleta para sensor {sensor_type} (VRef: {config['sensor']['v_ref']}V)..."
+    )
     serial_reading(
         port=config["hardware"]["port"],
         baudrate=config["hardware"]["baudrate"],

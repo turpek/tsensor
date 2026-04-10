@@ -1,14 +1,16 @@
 # Configurações do Sistema de Monitoramento de Temperatura (tsensor)
 
 [hardware]
-port = "/dev/ttyACM1"
+port = "/dev/ttyACM0"
 baudrate = 115200
 timeout = 1.0
+mcu = "arduino_uno"   # Opções: "arduino_uno", "esp32"
 
 [sensor]
 type = "LM35"         # Opções: "LM35" ou "NTC"
-adc_max = 1023        # 1023 (10-bit) ou 4095 (12-bit)
-v_ref = 1.1           # Tensão de referência em Volts
+# Se omitidos, adc_max e v_ref usarão os padrões do MCU escolhido
+adc_max = 1023
+v_ref = 1.1
 
 [acquisition]
 total_samples = 1000000
