@@ -1,73 +1,54 @@
-const $cru = e => document.querySelector(e);
-const $crus = e => document.querySelectorAll(e);
+/**
+ * cru.js v0.1 - Um framework minimalista para atualizações parciais
+ */
 
-// Estado interno de configuração
-let _cruConfig = {
-    prefix_url: "",
-    headers: {
-        "Content-Type": "application/json"
-    },
+let _cruOptions = {
     callbacks: {}
 };
 
-// Função de configuração que aceita novos parâmetros
-const $cruConfig = (config) => {
-    if (config) {
-        Object.assign(_cruConfig, config);
-    }
-};
+/**
+ * Configuração global do cru.js
+ */
+function $cruConfig(options) {
+    _cruOptions = { ..._cruOptions, ...options };
+}
 
-// Alias para compatibilidade se necessário
-const $C = $cruConfig;
+/**
+ * Carrega o conteúdo de um container baseado nos atributos c-
+ */
+async function $cruLoadContainer(element) {
+    if (!element) return;
 
-const $cruTypeResponse = async (type, response) => {
-    if (type === "json") return await response.json();
-    return await response.text();
-};
-
-const $cruLoadContainer = async (el) => {
-    if (!el) return; // Evita erro se o elemento não for encontrado no DOM
-
-    const url = el.getAttribute("c-container");
-    const targetSelector = el.getAttribute("c-target");
-    const type = el.getAttribute("c-type") || "html";
-    const callbackName = el.getAttribute("c-callback");
-
-    const timestamp = new Date().getTime();
-    const separator = url.includes("?") ? "&" : "?";
-    const finalUrl = _cruConfig.prefix_url + url + separator + "t=" + timestamp;
+    const url = element.getAttribute('c-container');
+    const type = element.getAttribute('c-type') || 'html';
+    const targetSelector = element.getAttribute('c-target');
+    const callbackName = element.getAttribute('c-callback');
 
     try {
-        const response = await fetch(finalUrl, {
-            method: "GET",
-            headers: _cruConfig.headers
-        });
-
-        const data = await $cruTypeResponse(type, response);
-        const target = targetSelector ? $cru(targetSelector) : el;
-
-        if (type === "html") {
-            target.innerHTML = data;
-        }
-
-        if (callbackName && _cruConfig.callbacks[callbackName]) {
-            _cruConfig.callbacks[callbackName](data, target);
+        const response = await fetch(url);
+        
+        if (type === 'json') {
+            const data = await response.json();
+            if (callbackName && _cruOptions.callbacks[callbackName]) {
+                _cruOptions.callbacks[callbackName](data, element);
+            }
+        } else {
+            const html = await response.text();
+            const target = targetSelector ? document.querySelector(targetSelector) : element;
+            if (target) {
+                target.innerHTML = html;
+            }
+            if (callbackName && _cruOptions.callbacks[callbackName]) {
+                _cruOptions.callbacks[callbackName](html, element);
+            }
         }
     } catch (error) {
         console.error(`[cru.js] Erro ao carregar ${url}:`, error);
     }
-};
+}
 
-const $cruLoadEvents = () => {
-    $crus("[c-container]").forEach(el => {
-        if (!el.classList.contains("loaded")) {
-            el.classList.add("loaded");
-            $cruLoadContainer(el);
-        }
-    });
-};
-
-// Inicialização automática
-window.addEventListener("DOMContentLoaded", () => {
-    $cruLoadEvents();
+// Inicializa elementos cru no carregamento da página
+document.addEventListener('DOMContentLoaded', () => {
+    // Procura por containers que devem ser carregados automaticamente (sem polling)
+    // Para este projeto, o polling é controlado manualmente no index.html
 });
