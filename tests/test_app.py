@@ -1,4 +1,5 @@
 import pytest
+from parsel import Selector
 from tsensor.app import app
 from tsensor.core.data_stream import DataStream
 
@@ -20,7 +21,7 @@ def test_route_index_status_code(client):
 def test_api_stats_returns_html_partial_with_mocked_values(client, mocker):
     """
     Testa exclusivamente a rota /api/stats.
-    Injeta um DataStream mockado localmente e valida a saída HTML.
+    Injeta um DataStream mockado localmente e valida a saída HTML com Seletores CSS.
     """
     # 1. Setup local do Mock
     test_stream = DataStream(total_samples=5)
@@ -28,22 +29,19 @@ def test_api_stats_returns_html_partial_with_mocked_values(client, mocker):
         test_stream.add(val)
 
     # 2. Patch usando o mocker do pytest
-    # O patch deve ser feito onde o objeto é CONSUMIDO pelas rotas
     mocker.patch("tsensor.routes.api.data_stream", test_stream)
 
     # 3. Execução
     response = client.get("/api/stats")
 
-    # 4. Asserts
+    # 4. Asserts com Parsel
     assert response.status_code == 200
-    html_data = response.data.decode("utf-8")
+    sel = Selector(response.data.decode("utf-8"))
 
-    assert "Média" in html_data
-    assert "Amostras" in html_data
-    assert "5" in html_data  # n (Amostras)
-    assert "30.0000" in html_data  # Média (x̄)
-    assert "10.00" in html_data  # Mínimo
-    assert "50.00" in html_data  # Máximo
+    assert sel.css("#stats-n::text").get() == "5"
+    assert sel.css("#stats-mean::text").get() == "30.0000"
+    assert sel.css("#stats-min::text").get() == "10.00"
+    assert sel.css("#stats-max::text").get() == "50.00"
 
 
 def test_api_histogram_returns_json_with_mocked_values(client, mocker):
@@ -72,3 +70,38 @@ def test_api_histogram_returns_json_with_mocked_values(client, mocker):
     assert isinstance(data["labels"], list)
     assert isinstance(data["values"], list)
     assert sum(data["values"]) == 5  # Total de amostras
+
+
+def test_api_stats_empty_stream(client, mocker):
+    """Verifica o comportamento da rota de estatísticas com stream vazio."""
+    test_stream = DataStream(total_samples=100)
+    mocker.patch("tsensor.routes.api.data_stream", test_stream)
+
+    response = client.get("/api/stats")
+    assert response.status_code == 200
+    sel = Selector(response.data.decode("utf-8"))
+
+    # n deve ser 0
+    assert sel.css("#stats-n::text").get() == "0"
+    # Média e DP devem ser 0.0000
+    assert sel.css("#stats-mean::text").get() == "0.0000"
+    assert sel.css("#stats-std::text").get() == "0.0000"
+    # Mínimo e Máximo devem ser 0.00
+    assert sel.css("#stats-min::text").get() == "0.00"
+    assert sel.css("#stats-max::text").get() == "0.00"
+
+
+def test_api_histogram_empty_stream(client, mocker):
+    """Verifica o comportamento da rota de histograma com stream vazio."""
+    test_stream = DataStream(total_samples=100)
+    mocker.patch("tsensor.routes.api.data_stream", test_stream)
+
+    response = client.get("/api/histogram")
+    assert response.status_code == 200
+    assert response.is_json
+
+    data = response.get_json()
+    assert "labels" in data
+    assert "values" in data
+    # Com 0 amostras, a soma das frequências deve ser 0
+    assert sum(data["values"]) == 0

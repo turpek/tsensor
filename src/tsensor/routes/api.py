@@ -11,8 +11,8 @@ def get_stats():
         "n": len(data_stream),
         "mean": data_stream.mean,
         "std": data_stream.std,
-        "min": data_stream.min,
-        "max": data_stream.max
+        "min": data_stream.min if str(data_stream.min) != 'inf' else 0,
+        "max": data_stream.max if str(data_stream.max) != '-inf' else 0,
     }
     # Retorna HTML renderizado
     return render_template('stats_cards.html', stats=stats_data)
