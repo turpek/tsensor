@@ -109,11 +109,11 @@
             }
         });
 
-        // Polling para simular o tempo real
+        // Polling dinâmico vindo do config.toml
         setInterval(() => {
             $cruLoadContainer(document.getElementById('stats-container'));
             $cruLoadContainer(document.getElementById('histogram-trigger'));
-        }, 1000);
+        }, {{ config.presentation.update_interval_ms }});
     </script>
 </body>
 </html>
