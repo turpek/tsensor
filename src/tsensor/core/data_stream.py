@@ -80,6 +80,19 @@ class DataStream:
             self._data.append((timestamp, data))
             self._update_stats(data)
 
+    def clear(self) -> None:
+        self._data.clear()
+        self._max = 0.0
+        self._total_count = 0
+        self._moving_sum = 0.0
+        self._moving_average = 0.0
+        self._mean = 0.0
+        self._max = -float('inf')
+        self._min = float('inf')
+        self.__m2 = 0.0
+        self.__old_shift = 0.0
+        self.__new_shift = 0.0
+
     def histogram(
         self,
         decimal_label: int = 1,
@@ -110,7 +123,7 @@ class DataStream:
 
     @property
     def moving_average(self) -> float:
-        return self._moving_sum / len(self)
+        return self._moving_average
 
     @property
     def std(self) -> float:
@@ -135,3 +148,7 @@ class DataStream:
     def sample(self) -> list:
         with self._lock:
             return list(self._data)
+
+    @property
+    def is_full(self) -> bool:
+        return self._total_samples == len(self)

@@ -25,6 +25,11 @@ def test_datastream_adicionar_amostra(stream_vazia):
     assert len(stream_vazia) == 1
 
 
+def test_datastream_moving_average_vazio(stream_vazia):
+    """Verifica se moving_average retorna 0.0 em vez de erro quando vazio."""
+    assert stream_vazia.moving_average == 0.0
+
+
 def test_datastream_mantem_tamanho_maximo_ao_exceder(stream_preenchida):
     stream_preenchida.add(25.3)
     assert len(stream_preenchida) == 3
@@ -64,6 +69,31 @@ def test_datastream_min_acumulado(stream_preenchida):
     assert stream_preenchida.min == 25.0
     stream_preenchida.add(23.5)
     assert stream_preenchida.min == 23.5
+
+
+def test_datastream_is_full_false_quando_vazio(stream_vazia):
+    """Verifica se is_full é falso quando o stream não atingiu o limite."""
+    assert stream_vazia.is_full is False
+    stream_vazia.add(25.0)
+    assert stream_vazia.is_full is False
+
+
+def test_datastream_is_full_true_quando_cheio(stream_preenchida):
+    """Verifica se is_full é verdadeiro quando o stream atinge total_samples."""
+    assert stream_preenchida.is_full is True
+
+
+def test_datastream_clear_reseta_estado(stream_preenchida):
+    """Verifica se o método clear limpa todos os dados e reseta estatísticas."""
+    stream_preenchida.clear()
+    
+    assert len(stream_preenchida) == 0
+    assert stream_preenchida.is_full is False
+    assert stream_preenchida.mean == 0.0
+    assert stream_preenchida.moving_average == 0.0
+    assert stream_preenchida.max == -float('inf')
+    assert stream_preenchida.min == float('inf')
+    assert stream_preenchida.std == 0.0
 
 
 def test_datastream_histogram_labels_lineares():
