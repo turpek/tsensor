@@ -1,10 +1,12 @@
 from collections import deque
 from datetime import datetime
 from math import sqrt, floor
+from threading import Lock
 
 
 class DataStream:
     def __init__(self, total_samples: int):
+        self._lock = Lock()
         self._total_count = 0
         self._total_samples = total_samples
         self._data: deque[tuple[str, float]] = deque()
@@ -48,21 +50,35 @@ class DataStream:
             width: float,
             bins: int,
             min_bins: int,
-    ):
+    ) -> tuple[int, float, list[str], float]:
         w_art = 10 ** (-decimal_label)
         if width > w_art:
-            return [
-                f'{(self.min + i * width):.{decimal_label}f}' for i in range(bins)
-            ]
+            return (
+                bins,
+                width,
+                [
+                    f'{(self.min + i * width):.{decimal_label}f}' for i in range(bins)
+                ],
+                self.min,
+            )
+
         left_offset = min_bins // 2
         start_val = self.min - (left_offset * w_art)
-        return [f'{(start_val + i * w_art):.{decimal_label}f}' for i in range(min_bins)]
+        return (
+            min_bins,
+            w_art,
+            [
+                f'{(start_val + i * w_art):.{decimal_label}f}' for i in range(min_bins)
+            ],
+            left_offset
+        )
 
     def add(self, data: float) -> None:
-        self._maintain_window()
-        timestamp = self._timestamp()
-        self._data.append((timestamp, data))
-        self._update_stats(data)
+        with self._lock:
+            self._maintain_window()
+            timestamp = self._timestamp()
+            self._data.append((timestamp, data))
+            self._update_stats(data)
 
     def histogram(
         self,
@@ -78,11 +94,11 @@ class DataStream:
         k = max(k, min_bins)
         h = self.amplitude / k
 
-        labels_list = self._get_labels(decimal_label, h, int(k), min_bins)
+        k, h, labels_list, min_ = self._get_labels(decimal_label, h, int(k), min_bins)
         histogram = {label: 0 for label in labels_list}
-
-        for _, data in self.sample:
-            idx = max(0, floor((data - self.min) / h))
+        samples_snapshot = list(self.sample)
+        for _, data in samples_snapshot:
+            idx = max(0, floor((data - min_) / h))
             if idx >= k:
                 idx = k - 1
             label = labels_list[idx]
@@ -117,5 +133,6 @@ class DataStream:
         return self.max - self.min
 
     @property
-    def sample(self) -> deque:
-        return self._data
+    def sample(self) -> list:
+        with self._lock:
+            return list(self._data)

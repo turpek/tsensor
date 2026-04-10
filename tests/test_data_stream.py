@@ -1,5 +1,5 @@
 import pytest
-from tsensor.data_stream import DataStream
+from tsensor.core.data_stream import DataStream
 
 
 @pytest.fixture
@@ -163,7 +163,7 @@ def test_datastream_histogram_idx_negativo(mocker):
     stream.add(20.0)
     stream.add(30.0)
 
-    mocker.patch("tsensor.data_stream.floor", return_value=-1)
+    mocker.patch("tsensor.core.data_stream.floor", return_value=-1)
 
     hist = stream.histogram()
     # Se floor é -1, o max(0, -1) deve jogar os dados para o primeiro bin
