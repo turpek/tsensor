@@ -8,11 +8,17 @@ def test_serial_reading_calls_handler_until_inactive(mocker):
     mock_serial_cls = mocker.patch("tsensor.core.serial_reader.Serial")
     mock_ser_instance = mock_serial_cls.return_value
 
-    # Simula o retorno de linhas pela serial (bytes)
-    mock_ser_instance.readline.side_effect = [b"1024\n", b"2048\n", b"3072\n"]
+    # Simula o retorno de linhas pela serial (bytes) no formato T=valor
+    mock_ser_instance.readline.side_effect = [
+        b"T=1024\n",
+        b"T=2048\n",
+        b"T=3072\n",
+        b"T=4096\n",
+    ]
 
     # 2. Mock do Handler
     # Criamos um mock e configuramos a property is_active para alternar valores
+    # O loop roda enquanto for True. No momento que for False, o loop para.
     mock_handler = mocker.Mock()
     type(mock_handler).is_active = mocker.PropertyMock(side_effect=[True, True, False])
 
@@ -43,7 +49,7 @@ def test_serial_reading_handles_decoding_errors(mocker):
     """Verifica se a função lida com caracteres inválidos na serial usando ignore."""
     mock_serial_cls = mocker.patch("tsensor.core.serial_reader.Serial")
     mock_ser_instance = mock_serial_cls.return_value
-    mock_ser_instance.readline.return_value = b"10\xff24\n"
+    mock_ser_instance.readline.return_value = b"T=10\xff24\n"
 
     mock_handler = mocker.Mock()
     type(mock_handler).is_active = mocker.PropertyMock(side_effect=[True, False])

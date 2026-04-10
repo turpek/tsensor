@@ -15,7 +15,11 @@ def serial_reading(
 
     while handler.is_active:
         line = ser.readline().decode('utf-8', errors='ignore').strip()
-        handler.handle(line)
+        if line.startswith("T="):
+            # Passa apenas o valor numérico após o 'T='
+            handler.handle(line[2:])
+        elif line:
+            logger.debug(f"Descartando dado fora do protocolo: {line!r}")
 
     ser.close()
     logger.info(f"Coleta finalizada: {len(handler.data)} amostras")
