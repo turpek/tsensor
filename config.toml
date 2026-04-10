@@ -9,7 +9,6 @@ timeout = 1.0
 type = "LM35"         # Opções: "LM35" ou "NTC"
 adc_max = 1023        # 1023 (10-bit) ou 4095 (12-bit)
 v_ref = 1.1           # Tensão de referência em Volts
-resolution_c = 0.1074 # Resolução térmica em ºC (ADC step / sensitivity)
 
 [acquisition]
 total_samples = 1000000

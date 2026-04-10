@@ -103,7 +103,6 @@ class DataStream:
         else:
             h_fd = 0.1
 
-        resolucao_adc = 0.1074
         h_ideal = max(h_fd, resolucao_adc)
 
         k = max(5, ceil(amplitude_visual / h_ideal))

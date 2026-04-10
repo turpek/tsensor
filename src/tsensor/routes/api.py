@@ -18,11 +18,15 @@ def get_stats():
 
 @api_route.route("/histogram", methods=["GET"])
 def get_histogram():
-    # Usa os valores dinâmicos do TOML
-    res_adc = config["sensor"]["v_ref"] / config["sensor"]["adc_max"]
+    # Calcula a resolução térmica: (V_ref / ADC_max) * 100
+    # O fator 100 vem da sensibilidade do LM35 (10mV/ºC -> 1V = 100ºC)
+    v_ref = config["sensor"]["v_ref"]
+    adc_max = config["sensor"]["adc_max"]
+    res_c = (v_ref / adc_max) * 100
+
     decimals = config["presentation"]["decimal_places"]
 
-    hist_dict = data_stream.histogram(res_adc, decimal_label=decimals)
+    hist_dict = data_stream.histogram(res_c, decimal_label=decimals)
 
     response_data = {
         "labels": list(hist_dict.keys()),
