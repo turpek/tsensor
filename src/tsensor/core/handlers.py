@@ -36,9 +36,10 @@ class NTCHandler:
             return int(line)
         except Exception as err:
             logger.error(f'Falha ao converter {line}. Exceção "{err}"')
+        return None
 
     def _check_adc(self, adc: int) -> bool:
-        return isinstance(adc, int) and 0 < adc < 4095
+        return 0 < adc < 4095
 
     def _convert(self, adc: int):
         V = adc * 3.3 / 4095.0
@@ -56,7 +57,7 @@ class NTCHandler:
 
     def handle(self, line: str) -> None:
         adc = self._str_to_int(line)
-        if self._check_adc(adc):
+        if adc is not None and self._check_adc(adc):
             temperature = self._convert(adc)
             self._data.add(temperature)
             self._temporal_data.add(temperature)

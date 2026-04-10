@@ -9,12 +9,7 @@ def handler():
     """Configura uma instância de NTCHandler para testes."""
     data = DataStream(total_samples=100)
     temporal_data = DataStream(total_samples=100)
-    return NTCHandler(
-        data=data,
-        temporal_data=temporal_data,
-        samples=10,
-        timeout=1
-    )
+    return NTCHandler(data=data, temporal_data=temporal_data, samples=10, timeout=1)
 
 
 def test_ntc_handler_initially_is_active(handler):
@@ -26,13 +21,10 @@ def test_ntc_handler_becomes_inactive_after_timeout():
     """Verifica se o handler fica inativo após o tempo de timeout (0.1s) expirar sem dados."""
     data = DataStream(total_samples=100)
     temporal_data = DataStream(total_samples=100)
-    
+
     # Timeout de 0.1 segundo para o teste ser ultrarrápido
     handler = NTCHandler(
-        data=data,
-        temporal_data=temporal_data,
-        samples=10,
-        timeout=0.1
+        data=data, temporal_data=temporal_data, samples=10, timeout=0.1
     )
 
     # Inicialmente ativo
@@ -51,10 +43,10 @@ def test_ntc_handler_becomes_inactive_after_reaching_samples(handler, mocker):
     # Mockando len(self._data) para retornar o limite de samples (10)
     mock_data = mocker.MagicMock(spec=DataStream)
     mock_data.__len__.return_value = 10
-    
+
     # Injetando o mock no handler
     handler._data = mock_data
-    
+
     # 2. Assert: is_active deve ser False agora
     assert handler.is_active is False
 
@@ -67,11 +59,11 @@ def test_ntc_handler_handle_valid_data(handler):
     # 2. Asserts
     assert len(handler.temporal_data) == 1
     assert len(handler.data) == 1
-    
+
     # Valida se houve a inserção da temperatura correta (aprox 25.5)
     _, val_temp = handler.temporal_data.sample[0]
     _, val_data = handler.data.sample[0]
-    
+
     assert val_temp == pytest.approx(25.5, abs=0.1)
     assert val_data == pytest.approx(25.5, abs=0.1)
 
@@ -99,6 +91,6 @@ def test_ntc_handler_handle_invalid_string(handler):
     # Deve ignorar e não levantar exceção (ValueError)
     handler.handle("abc")
     handler.handle("25.5.5")
-    
+
     assert len(handler.temporal_data) == 0
     assert len(handler.data) == 0
