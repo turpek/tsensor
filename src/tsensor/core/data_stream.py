@@ -1,6 +1,7 @@
 from collections import deque
 from math import ceil, sqrt
 from threading import Lock
+from typing import Optional
 
 
 class DataStream:
@@ -46,7 +47,7 @@ class DataStream:
             self._data.append((timestamp, data))
             self._update_stats(data)
 
-    def clear(self) -> None:
+    def clear(self, total_samples: Optional[int] = None) -> None:
         self._data.clear()
         self._max = 0.0
         self._total_count = 0
@@ -58,6 +59,9 @@ class DataStream:
         self.__m2 = 0.0
         self.__old_shift = 0.0
         self.__new_shift = 0.0
+
+        if total_samples:
+            self._total_samples = total_samples
 
     def histogram(
         self,

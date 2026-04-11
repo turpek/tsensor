@@ -118,8 +118,11 @@ def restart_acquisition_route():
     """Rota específica para reinicializar manualmente o hardware."""
     try:
         stop_acquisition()
-        data_stream.clear()
-        buffer_stream.clear()
+        
+        # Limpa os streams e atualiza o tamanho dos buffers com a config atual
+        data_stream.clear(total_samples=config["acquisition"]["total_samples"])
+        buffer_stream.clear(total_samples=config["acquisition"]["buffer_samples"])
+        
         start_acquisition()
         return jsonify({"success": True, "message": "Hardware reiniciado."})
     except Exception as e:

@@ -1,7 +1,7 @@
 import pytest
 from parsel import Selector
 from tsensor.core.data_stream import DataStream
-from tsensor.extensions import data_stream, buffer_stream
+from tsensor.extensions import data_stream, buffer_stream, config
 from tsensor.core.utils import MCU_PRESETS
 
 def test_api_status_returns_connection_state(client, mocker):
@@ -141,12 +141,11 @@ def test_api_config_saves_and_applies_presets(mocker, client):
 
 
 def test_api_restart_clears_data_and_restarts_acquisition(client, mocker):
-    """Verifica se /api/restart para a aquisição, limpa dados e reinicia."""
-    data_stream.add(25.0, "10:00:00")
-    buffer_stream.add(25.0, "10:00:00")
-    assert len(data_stream) == 1
-    assert len(buffer_stream) == 1
-
+    """Verifica se /api/restart para a aquisição, limpa dados com novo tamanho e reinicia."""
+    # Mock do clear para capturar argumentos
+    mock_data_clear = mocker.patch.object(data_stream, "clear")
+    mock_buffer_clear = mocker.patch.object(buffer_stream, "clear")
+    
     mocker.patch("tsensor.routes.api.stop_acquisition")
     mocker.patch("tsensor.routes.api.start_acquisition")
 
@@ -155,8 +154,9 @@ def test_api_restart_clears_data_and_restarts_acquisition(client, mocker):
     assert response.status_code == 200
     assert response.json["success"] is True
     
-    assert len(data_stream) == 0
-    assert len(buffer_stream) == 0
+    # Verifica se o clear foi chamado com os valores da config
+    mock_data_clear.assert_called_once_with(total_samples=config["acquisition"]["total_samples"])
+    mock_buffer_clear.assert_called_once_with(total_samples=config["acquisition"]["buffer_samples"])
 
 
 @pytest.fixture
