@@ -80,9 +80,13 @@ class DataStream:
         q3 = temperaturas[q3_idx]
         iqr = q3 - q1
 
+        # Impede que o IQR zere se os dados forem hiperestáveis,
+        # garantindo que a margem de Tukey e o binning (h_fd) sejam válidos.
+        iqr_seguro = max(iqr, resolucao_adc)
+
         # --- FILTRO DE OUTLIERS DE TUKEY ---
-        # Multiplicador 1.5 ou 2.0 (2.0 é mais tolerante e evita cortar dados válidos)
-        margem = 2.0 * iqr
+        # Multiplicador 2.0 (mais tolerante para evitar cortar dados reais próximos)
+        margem = 2.0 * iqr_seguro
         limite_inferior = q1 - margem
         limite_superior = q3 + margem
 
@@ -90,7 +94,7 @@ class DataStream:
             x for x in temperaturas if limite_inferior <= x <= limite_superior
         ]
 
-        # Se por acaso filtrar tudo (muito raro), aborta e usa o normal
+        # Se por acaso filtrar tudo (muito raro), aborta e usa o original
         if not dados_limpos:
             dados_limpos = temperaturas
 
@@ -98,14 +102,11 @@ class DataStream:
         max_visual = dados_limpos[-1]
         amplitude_visual = max_visual - min_visual
 
-        if iqr > 0:
-            h_fd = 2 * iqr / (n ** (1 / 3))
-        else:
-            h_fd = 0.1
-
+        # Binning de Freedman-Diaconis baseado no IQR seguro
+        h_fd = 2.0 * iqr_seguro / (n ** (1 / 3))
         h_ideal = max(h_fd, resolucao_adc)
 
-        k = max(5, ceil(amplitude_visual / h_ideal))
+        k = max(1, ceil(amplitude_visual / h_ideal))
         h_real = amplitude_visual / k if amplitude_visual > 0 else h_ideal
 
         labels_list = [

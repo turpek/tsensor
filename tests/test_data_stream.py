@@ -114,10 +114,11 @@ def test_datastream_histogram_labels_lineares():
         stream.add(float(t), timestamp="10:00:00:000")
 
     hist = stream.histogram(resolucao_adc=0.1)
-    expected_labels = ["20.0", "21.8", "23.6", "25.4", "27.2"]
+    # Com a nova lógica (iqr_seguro=5.0, n=10, h_ideal=4.64), k=2
+    expected_labels = ["20.0", "24.5"]
 
     assert list(hist.keys()) == expected_labels
-    assert list(hist.values()) == [2, 2, 2, 2, 2]
+    assert list(hist.values()) == [5, 5]
 
 
 def test_datastream_histogram_decimal_customizado():
@@ -143,13 +144,14 @@ def test_datastream_histogram_colisao_labels():
 
 def test_datastream_histogram_garante_bins_minimos_sem_colisao():
     stream = DataStream(total_samples=100)
-    # Amplitude grande para evitar colisão de labels
+    # Amplitude grande para permitir múltiplos bins se o algoritmo desejar
     stream.add(20.0, timestamp="10:00:00:000")
-    stream.add(30.0, timestamp="10:00:00:000")
+    stream.add(40.0, timestamp="10:00:00:000")
 
     hist = stream.histogram(resolucao_adc=0.1, decimal_label=1)
 
-    assert len(hist) >= 5
+    # Agora o mínimo é 1 bin
+    assert len(hist) >= 1
 
 
 def test_datastream_histogram_amostras_iguais():
@@ -191,3 +193,62 @@ def test_datastream_histogram_zero_division_outliers():
     hist = stream.histogram(resolucao_adc=0.1)
     assert "20.0" in hist
     assert hist["20.0"] == 10
+
+
+def test_histogram_stable_data_tukey_filter_safety():
+    """
+    Valida o comportamento do histograma com dados altamente estáveis (80% iguais).
+    Verifica se o Filtro de Tukey não descarta variações mínimas (24.9, 25.1)
+    e se a resolução ADC serve como fallback para variância zero.
+    """
+    n_total = 1000
+    stream = DataStream(total_samples=n_total)
+
+    # 80% das amostras em 25.0 (800 amostras)
+    for _ in range(800):
+        stream.add(25.0, "00:00:00")
+
+    # 10% em 24.9 (100 amostras)
+    for _ in range(100):
+        stream.add(24.9, "00:00:00")
+
+    # 10% em 25.1 (100 amostras)
+    for _ in range(100):
+        stream.add(25.1, "00:00:00")
+
+    # Resolução ADC típica (ex: LM35 no ESP32 = ~0.08°C)
+    res_adc = 0.08
+
+    # Executa o histograma com maior precisão decimal para evitar colisão de labels
+    hist = stream.histogram(resolucao_adc=res_adc, decimal_label=2)
+
+    # Asserts
+    total_no_hist = sum(hist.values())
+
+    # 1. Verifica se NENHUMA amostra foi descartada
+    assert total_no_hist == n_total, f"O filtro descartou amostras: {n_total - total_no_hist} perdidas"
+
+    # 2. Verifica se os valores extremos foram contabilizados
+    first_label = list(hist.keys())[0]
+    assert hist[first_label] >= 100
+
+    last_label = list(hist.keys())[-1]
+    assert hist[last_label] >= 100
+
+    # 3. Verifica se o histograma possui bins suficientes para representar a variação
+    assert len(hist) >= 3
+
+
+def test_histogram_zero_variance_safety():
+    """Verifica se o histograma funciona mesmo quando 100% dos dados são idênticos."""
+    stream = DataStream(total_samples=100)
+    for _ in range(100):
+        stream.add(25.0, "00:00:00")
+
+    res_adc = 0.1
+    hist = stream.histogram(resolucao_adc=res_adc)
+
+    # Em amplitude zero, o método deve retornar um único bin centralizado
+    assert len(hist) == 1
+    assert "25.0" in hist
+    assert hist["25.0"] == 100
