@@ -3,7 +3,42 @@ from tsensor.extensions import data_stream, buffer_stream, config, app_status
 from tsensor.core.utils import save_config, MCU_PRESETS
 from tsensor.core.acquisition import start_acquisition, stop_acquisition
 
+from tsensor.core.exporters import GoogleDriveExporter
+
 api_route = Blueprint("api", __name__, url_prefix="/api")
+...
+@api_route.route("/export", methods=["POST"])
+def export_data():
+    """Exporta os dados atuais para o Google Drive."""
+    try:
+        drive_config = config["exporter"]["google_drive"]
+        
+        exporter = GoogleDriveExporter(
+            credentials_path=drive_config["credentials_file"],
+            token_path=drive_config["token_file"],
+            scopes=drive_config["scopes"],
+            header=["timestamp", "temperatura"]
+        )
+        
+        # Prepara a conexão (OAuth)
+        exporter.setup()
+        
+        # Obtém os dados atuais do stream
+        data = data_stream.sample
+        
+        if not data:
+            return jsonify({"error": "Não há dados para exportar."}), 400
+            
+        # Realiza o upload
+        success = exporter.export(data, drive_config["file_name"])
+        
+        if success:
+            return jsonify({"success": True, "message": "Dados exportados."})
+        else:
+            return jsonify({"error": "Falha no upload para o Drive."}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @api_route.route("/status", methods=["GET"])

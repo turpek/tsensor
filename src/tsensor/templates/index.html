@@ -7,134 +7,127 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
-<body class="bg-slate-50 min-h-screen font-sans text-slate-900">
+<body class="bg-slate-50 min-h-screen text-slate-900">
 
-    <!-- Setup Overlay (Exibido se a conexão falhar) -->
+    <!-- Setup Overlay -->
     <div id="setup-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-        <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-slate-200 overflow-hidden flex flex-col md:flex-row">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-slate-200 overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-300">
             
             <!-- Lateral Esquerda: Info & Status -->
-            <div class="bg-slate-50 p-8 md:w-1/3 border-r border-slate-100 flex flex-col justify-between">
+            <div class="bg-slate-50 p-10 md:w-1/3 border-r border-slate-100 flex flex-col justify-between">
                 <div>
                     <div class="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-200">
                         <i class="bi bi-sliders2-vertical text-3xl"></i>
                     </div>
                     <h2 class="text-2xl font-black text-slate-800 leading-tight mb-4">Ajustes do <span class="text-blue-600">Sistema</span></h2>
-                    <p class="text-slate-500 text-sm leading-relaxed">Configure os parâmetros de comunicação serial e interface para iniciar a monitoração em tempo real.</p>
+                    <p class="text-slate-500 text-sm leading-relaxed font-medium">Configure os parâmetros de comunicação serial e sensor para iniciar a monitoração.</p>
                 </div>
 
                 <div class="mt-8 space-y-4">
-                    <div class="flex items-start gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
+                    <div class="flex items-start gap-3 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
                         <i class="bi bi-info-circle-fill text-blue-500 mt-0.5"></i>
-                        <p class="text-xs text-slate-600">As alterações serão aplicadas e o dashboard será reiniciado automaticamente.</p>
+                        <p class="text-[11px] text-slate-600 leading-snug font-medium">As alterações serão aplicadas e a conexão será testada imediatamente.</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Lateral Direita: Formulário em Grid -->
-            <div class="p-8 md:w-2/3 bg-white overflow-y-auto max-h-[85vh] relative">
-                <!-- Botão Fechar -->
-                <button id="close-setup" class="absolute right-6 top-6 text-slate-400 hover:text-slate-900 transition-colors p-2 hover:bg-slate-100 rounded-full hidden">
+            <!-- Lateral Direita: Formulário -->
+            <div class="p-10 md:w-2/3 bg-white overflow-y-auto max-h-[85vh] relative">
+                <button id="close-setup" class="absolute right-6 top-6 text-slate-400 hover:text-slate-900 transition-colors p-2 hover:bg-slate-50 rounded-full hidden">
                     <i class="bi bi-x-lg text-xl"></i>
                 </button>
 
                 <form id="setup-form" class="space-y-8">
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                    <div id="setup-error" class="hidden bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl text-sm flex items-center gap-3 font-semibold">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <span id="setup-error-text"></span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
                         
                         <!-- Coluna 1: Hardware -->
-                        <div class="space-y-5">
-                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <div class="space-y-6">
+                            <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                                 <i class="bi bi-cpu"></i> Hardware & Conexão
                             </h3>
                             
-                            <div class="space-y-4">
+                            <div class="space-y-5">
                                 <div>
-                                    <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Porta Serial</label>
-                                    <div class="relative group">
-                                        <i class="bi bi-usb-symbol absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg transition-colors group-focus-within:text-blue-500"></i>
-                                        <input type="text" name="port" id="setup-port" value="{{ config.hardware.port }}"
-                                               class="w-full pl-10 pr-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-slate-50/50">
-                                    </div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">Porta Serial</label>
+                                    <input type="text" name="port" value="{{ config.hardware.port }}"
+                                           class="w-full px-4 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none transition-all bg-slate-50 font-mono font-bold text-blue-600">
                                 </div>
 
-                                <div class="grid grid-cols-2 gap-3">
+                                <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">MCU</label>
-                                        <select name="mcu" id="setup-mcu" 
-                                                class="w-full px-3 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-slate-50/50">
-                                            <option value="arduino_uno" {% if config.hardware.mcu == 'arduino_uno' %}selected{% endif %}>Uno</option>
+                                        <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">MCU</label>
+                                        <select name="mcu" id="setup-mcu" class="w-full px-3 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none transition-all bg-slate-50 font-semibold cursor-pointer">
                                             <option value="esp32" {% if config.hardware.mcu == 'esp32' %}selected{% endif %}>ESP32</option>
+                                            <option value="arduino_uno" {% if config.hardware.mcu == 'arduino_uno' %}selected{% endif %}>Uno</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Baudrate</label>
-                                        <select name="baudrate" id="setup-baudrate"
-                                                class="w-full px-3 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-slate-50/50">
-                                            <option value="9600" {% if config.hardware.baudrate == 9600 %}selected{% endif %}>9600</option>
-                                            <option value="115200" {% if config.hardware.baudrate == 115200 %}selected{% endif %}>115200</option>
-                                        </select>
+                                        <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">Baudrate</label>
+                                        <input type="number" name="baudrate" value="{{ config.hardware.baudrate }}" class="w-full px-3 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50">
                                     </div>
                                 </div>
 
-                                <div class="grid grid-cols-2 gap-3">
+                                <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">V_Ref (V)</label>
-                                        <input type="number" step="0.1" name="v_ref" id="setup-vref" value="{{ config.sensor.v_ref }}"
-                                               class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-white font-mono">
+                                        <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">V_Ref (V)</label>
+                                        <input type="number" step="0.01" name="v_ref" id="setup-vref" value="{{ config.sensor.v_ref }}"
+                                               class="w-full px-4 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50 font-bold">
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">ADC Max</label>
+                                        <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">ADC Max</label>
                                         <input type="number" name="adc_max" id="setup-adcmax" value="{{ config.sensor.adc_max }}"
-                                               class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-white font-mono">
+                                               class="w-full px-4 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50 font-bold">
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Coluna 2: Aquisição & Interface -->
-                        <div class="space-y-6">
-                            <!-- Aquisição -->
-                            <div class="space-y-4">
-                                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <!-- Coluna 2: Amostragem & Interface -->
+                        <div class="space-y-8">
+                            <div class="space-y-6">
+                                <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                                     <i class="bi bi-database-down"></i> Amostragem
                                 </h3>
                                 <div>
-                                    <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Tamanho do Buffer (N)</label>
+                                    <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">Limite do Buffer</label>
                                     <input type="number" name="total_samples" value="{{ config.acquisition.total_samples }}"
-                                           class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-slate-50/50">
+                                           class="w-full px-4 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50 font-extrabold">
                                 </div>
                             </div>
 
-                            <!-- Interface -->
-                            <div class="space-y-4 pt-2">
-                                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <div class="space-y-6 pt-2">
+                                <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                                     <i class="bi bi-palette"></i> Apresentação
                                 </h3>
-                                <div class="grid grid-cols-2 gap-3">
+                                <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Update (ms)</label>
+                                        <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">Update (ms)</label>
                                         <input type="number" name="update_interval_ms" value="{{ config.presentation.update_interval_ms }}"
-                                               class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-slate-50/50">
+                                               class="w-full px-4 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50">
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Decimais</label>
+                                        <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">Decimais</label>
                                         <input type="number" name="decimal_places" value="{{ config.presentation.decimal_places }}" min="0" max="4"
-                                               class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-slate-50/50">
+                                               class="w-full px-4 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50">
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="pt-6 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
-                        <p id="setup-error" class="text-sm text-red-600 font-semibold flex items-center gap-2 hidden">
-                            <i class="bi bi-exclamation-triangle-fill"></i> <span></span>
-                        </p>
-                        <div class="flex-grow"></div>
+                    <div class="pt-8 border-t border-slate-100 flex items-center justify-end">
                         <button type="submit" id="setup-submit"
-                                class="w-full md:w-auto min-w-[200px] bg-slate-900 hover:bg-black text-white font-black py-4 px-8 rounded-2xl transition-all shadow-xl hover:shadow-2xl active:scale-95 flex items-center justify-center gap-3 group">
+                                class="w-full md:w-auto bg-slate-900 hover:bg-black text-white font-black py-4 px-12 rounded-2xl transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3 group">
                             <span>SALVAR AJUSTES</span>
                             <i class="bi bi-arrow-right-circle text-xl group-hover:translate-x-1 transition-transform"></i>
                         </button>
@@ -144,211 +137,171 @@
         </div>
     </div>
 
+    <!-- Navegação -->
     <nav class="bg-slate-800 text-white shadow-lg mb-8">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
             <div class="flex items-center gap-2">
                 <i class="bi bi-cpu text-blue-400 text-2xl"></i>
-                <h1 class="text-xl font-bold tracking-tight">TSENSOR <span class="text-blue-400 text-sm font-normal">v1.0</span></h1>
+                <h1 class="text-xl font-bold tracking-tight">TSENSOR <span class="text-blue-400 text-sm font-normal uppercase tracking-widest ml-1">Core</span></h1>
             </div>
-            <div class="flex items-center gap-4 text-sm font-medium">
-                <span class="flex items-center gap-1.5"><i class="bi bi-circle-fill text-green-500 text-[10px] animate-pulse"></i> LIVE</span>
-                <div class="flex items-center gap-2">
-                    <button id="restart-hardware-btn" class="flex items-center gap-2 bg-red-600/10 hover:bg-red-600/20 text-red-500 px-4 py-2 rounded-lg transition-all border border-red-500/20 active:scale-95 group">
-                        <i class="bi bi-arrow-clockwise group-hover:rotate-180 transition-transform duration-500"></i>
-                        <span>REINICIAR</span>
-                    </button>
-                    <button id="open-setup" class="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-all border border-slate-600 active:scale-95 group">
-                        <i class="bi bi-gear-fill group-hover:rotate-90 transition-transform duration-500"></i>
-                        <span>CONFIGURAÇÕES</span>
-                    </button>
-                </div>
+            <div class="flex items-center gap-3">
+                <button id="export-btn" class="flex items-center gap-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 px-4 py-2 rounded-xl transition-all border border-blue-500/20 active:scale-95 group">
+                    <i class="bi bi-cloud-arrow-up group-hover:-translate-y-0.5 transition-transform"></i>
+                    <span class="text-xs font-bold uppercase tracking-wider">Exportar</span>
+                </button>
+                <button id="restart-hardware-btn" class="flex items-center gap-2 bg-red-600/10 hover:bg-red-600/20 text-red-500 px-4 py-2 rounded-xl transition-all border border-red-500/20 active:scale-95 group">
+                    <i class="bi bi-arrow-clockwise group-hover:rotate-180 transition-transform duration-500"></i>
+                    <span class="text-xs font-bold uppercase tracking-wider">Reiniciar</span>
+                </button>
+                <button id="open-setup" class="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl transition-all border border-slate-600 active:scale-95 group">
+                    <i class="bi bi-gear-fill group-hover:rotate-90 transition-transform duration-500"></i>
+                    <span class="text-xs font-bold uppercase tracking-wider">Configurar</span>
+                </button>
             </div>
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto px-4 pb-12">
-        <!-- Dashboard Header -->
+    <main class="max-w-7xl mx-auto px-6 pb-12">
         <header class="mb-8">
-            <h2 class="text-3xl font-bold text-slate-800">Dashboard de Aquisição</h2>
-            <p class="text-slate-500">Monitoramento contínuo via Serial (ESP32)</p>
+            <h2 class="text-3xl font-black text-slate-800 tracking-tight">Dashboard de Monitoramento</h2>
+            <p class="text-slate-500 font-medium italic">Aquisição contínua de dados térmicos em tempo real</p>
         </header>
 
-        <!-- Stats Container (Atualizado via cru.js) -->
-        <div id="stats-container"
-             c-container="/api/stats"
-             c-target="#stats-container"
-             class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-            <!-- Os cards serão injetados aqui pelo Flask via partial template -->
-            <div class="animate-pulse bg-white p-6 rounded-xl h-24 shadow-sm border border-slate-100"></div>
-            <div class="animate-pulse bg-white p-6 rounded-xl h-24 shadow-sm border border-slate-100"></div>
-            <div class="animate-pulse bg-white p-6 rounded-xl h-24 shadow-sm border border-slate-100"></div>
-            <div class="animate-pulse bg-white p-6 rounded-xl h-24 shadow-sm border border-slate-100"></div>
-            <div class="animate-pulse bg-white p-6 rounded-xl h-24 shadow-sm border border-slate-100"></div>
+        <div id="stats-container" c-container="/api/stats" c-target="#stats-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+            <div class="animate-pulse bg-white p-6 rounded-2xl h-24 shadow-sm border border-slate-100"></div>
+            <div class="animate-pulse bg-white p-6 rounded-2xl h-24 shadow-sm border border-slate-100"></div>
+            <div class="animate-pulse bg-white p-6 rounded-2xl h-24 shadow-sm border border-slate-100"></div>
+            <div class="animate-pulse bg-white p-6 rounded-2xl h-24 shadow-sm border border-slate-100"></div>
+            <div class="animate-pulse bg-white p-6 rounded-2xl h-24 shadow-sm border border-slate-100"></div>
         </div>
 
-        <!-- Gráfico de Histograma -->
-        <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-slate-700 font-bold text-lg flex items-center gap-2">
+        <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8">
+            <div class="flex justify-between items-center mb-8">
+                <h3 class="text-slate-800 font-black text-xl flex items-center gap-3">
                     <i class="bi bi-bar-chart-fill text-blue-500"></i> Distribuição das Leituras
                 </h3>
-                <span class="text-xs text-slate-400 uppercase tracking-widest font-semibold">Atualização Automática</span>
+                <div class="flex items-center gap-2 bg-green-50 text-green-600 px-4 py-2 rounded-full text-[10px] font-black border border-green-100 uppercase tracking-widest">
+                    <i class="bi bi-circle-fill animate-pulse text-[8px]"></i> LIVE
+                </div>
             </div>
-            <div class="relative h-[400px] w-full"
-                 id="histogram-trigger"
-                 c-container="/api/histogram"
-                 c-type="json"
-                 c-callback="renderHistogram">
+            <div class="relative h-[450px] w-full" id="histogram-trigger" c-container="/api/histogram" c-type="json" c-callback="renderHistogram">
                 <canvas id="histogramChart"></canvas>
             </div>
         </div>
     </main>
 
-    <!-- cru.js para manipulação dinâmica -->
     <script src="{{ url_for('static', filename='js/cru.js') }}"></script>
 
     <script>
         let chartInstance = null;
         let pollingIntervalId = null;
 
-        // Elementos do DOM
-        const setupOverlay = document.getElementById('setup-overlay');
-        const setupForm = document.getElementById('setup-form');
-        const setupError = document.getElementById('setup-error');
-        const setupSubmit = document.getElementById('setup-submit');
-        const openSetupBtn = document.getElementById('open-setup');
-        const closeSetupBtn = document.getElementById('close-setup');
-        const restartHardwareBtn = document.getElementById('restart-hardware-btn');
-
-        // Reinicia o hardware e a coleta
-        restartHardwareBtn.addEventListener('click', async () => {
-            if (!confirm("Isso irá apagar todos os dados atuais e reiniciar a conexão serial. Continuar?")) return;
-            
-            restartHardwareBtn.disabled = true;
-            restartHardwareBtn.innerHTML = '<i class="bi bi-arrow-repeat animate-spin"></i> REINICIANDO...';
-            
-            try {
-                const response = await fetch('/api/restart', { method: 'POST' });
-                const result = await response.json();
-                
-                if (result.success) {
-                    window.location.reload();
-                } else {
-                    alert("Erro ao reiniciar: " + result.error);
-                    restartHardwareBtn.disabled = false;
-                    restartHardwareBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> <span>REINICIAR</span>';
-                }
-            } catch (err) {
-                alert("Erro de comunicação com o servidor.");
-                restartHardwareBtn.disabled = false;
-                restartHardwareBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> <span>REINICIAR</span>';
-            }
-        });
-
-        // Abre o modal manualmente
-        openSetupBtn.addEventListener('click', () => {
-            setupOverlay.classList.remove('hidden');
-        });
-
-        // Fecha o modal manualmente
-        closeSetupBtn.addEventListener('click', () => {
-            setupOverlay.classList.add('hidden');
-        });
-
-        // Atalho ESC para fechar o modal
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !setupOverlay.classList.contains('hidden')) {
-                // Apenas fecha se o botão de fechar estiver visível (ou seja, se não for obrigatório)
-                if (!closeSetupBtn.classList.contains('hidden')) {
-                    setupOverlay.classList.add('hidden');
-                }
-            }
-        });
-
-        // Verifica status da conexão ao carregar
         async function checkStatus() {
             try {
                 const response = await fetch('/api/status');
                 const status = await response.json();
-                
+                const overlay = document.getElementById('setup-overlay');
+                const closeBtn = document.getElementById('close-setup');
+                const errBox = document.getElementById('setup-error');
+                const errText = document.getElementById('setup-error-text');
+
                 if (!status.connected) {
-                    setupOverlay.classList.remove('hidden');
-                    closeSetupBtn.classList.add('hidden'); // Força a configuração se desconectado
+                    overlay.classList.remove('hidden');
+                    closeBtn.classList.add('hidden');
                     if (status.error) {
-                        setupError.innerText = `Erro: ${status.error}`;
-                        setupError.classList.remove('hidden');
+                        errText.innerText = status.error;
+                        errBox.classList.remove('hidden');
                     }
                 } else {
-                    setupOverlay.classList.add('hidden');
-                    closeSetupBtn.classList.remove('hidden'); // Permite fechar se conectado
+                    overlay.classList.add('hidden');
+                    closeBtn.classList.remove('hidden');
                     startPolling();
                 }
             } catch (err) {
-                console.error("Falha ao obter status:", err);
+                document.getElementById('setup-overlay').classList.remove('hidden');
             }
         }
 
-        // Envia novas configurações (Persiste sem resetar aquisição)
-        setupForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            setupSubmit.disabled = true;
-            setupSubmit.innerHTML = '<i class="bi bi-arrow-repeat animate-spin"></i> SALVANDO...';
+        function startPolling() {
+            if (pollingIntervalId) clearInterval(pollingIntervalId);
+            pollingIntervalId = setInterval(() => {
+                $cruLoadContainer(document.getElementById('stats-container'));
+                $cruLoadContainer(document.getElementById('histogram-trigger'));
+            }, {{ config.presentation.update_interval_ms }});
+        }
 
-            const formData = new FormData(setupForm);
-            const data = Object.fromEntries(formData.entries());
+        document.addEventListener('DOMContentLoaded', () => {
+            checkStatus();
+            const presets = { 'arduino_uno': { vref: 1.1, adc: 1023 }, 'esp32': { vref: 3.3, adc: 4095 } };
 
-            try {
-                const response = await fetch('/api/config', {
+            document.getElementById('setup-mcu').addEventListener('change', (e) => {
+                const p = presets[e.target.value];
+                if (p) {
+                    document.getElementById('setup-vref').value = p.vref;
+                    document.getElementById('setup-adcmax').value = p.adc;
+                }
+            });
+
+            document.getElementById('setup-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const data = Object.fromEntries(new FormData(e.target).entries());
+                const res = await fetch('/api/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    // Tenta verificar se a conexão foi estabelecida após o salvamento
-                    setTimeout(checkStatus, 500);
-                } else {
-                    setupError.innerText = result.error || "Erro ao salvar.";
-                    setupError.classList.remove('hidden');
+                if (res.ok) setTimeout(checkStatus, 500);
+            });
+
+            document.getElementById('export-btn').addEventListener('click', async () => {
+                if (!confirm("Exportar dados agora para o Google Drive?")) return;
+                const btn = document.getElementById('export-btn');
+                btn.disabled = true;
+                try {
+                    const res = await fetch('/api/export', { method: 'POST' });
+                    const result = await res.json();
+                    alert(result.success ? "Dados exportados com sucesso!" : "Falha: " + result.error);
+                } catch (e) { alert("Erro de comunicação."); }
+                btn.disabled = false;
+            });
+
+            document.getElementById('restart-hardware-btn').addEventListener('click', async () => {
+                if (!confirm("Isso irá apagar todos os dados e reiniciar a conexão. Continuar?")) return;
+                await fetch('/api/restart', { method: 'POST' });
+                window.location.reload();
+            });
+
+            document.getElementById('open-setup').addEventListener('click', () => document.getElementById('setup-overlay').classList.remove('hidden'));
+            document.getElementById('close-setup').addEventListener('click', () => document.getElementById('setup-overlay').classList.add('hidden'));
+            
+            document.addEventListener('keydown', (e) => {
+                const overlay = document.getElementById('setup-overlay');
+                const closeBtn = document.getElementById('close-setup');
+                if (e.key === 'Escape' && !overlay.classList.contains('hidden')) {
+                    if (!closeBtn.classList.contains('hidden')) overlay.classList.add('hidden');
                 }
-            } catch (err) {
-                setupError.innerText = "Erro de rede ao salvar.";
-                setupError.classList.remove('hidden');
-            } finally {
-                setupSubmit.disabled = false;
-                setupSubmit.innerHTML = '<span>SALVAR AJUSTES</span><i class="bi bi-arrow-right-circle"></i>';
-            }
+            });
         });
 
         $cruConfig({
             callbacks: {
-                renderHistogram: (data, target) => {
+                renderHistogram: (data) => {
                     const ctx = document.getElementById('histogramChart').getContext('2d');
-
                     if (chartInstance) {
-                        // Atualiza apenas os dados e labels para manter a transição suave
                         chartInstance.data.labels = data.labels;
                         chartInstance.data.datasets[0].data = data.values;
-                        chartInstance.update('none'); // 'none' desabilita animação de reconstrução, mantendo apenas o ajuste
+                        chartInstance.update('none');
                         return;
                     }
-
                     chartInstance = new Chart(ctx, {
-
                         type: 'bar',
                         data: {
                             labels: data.labels,
                             datasets: [{
                                 label: 'Frequência',
                                 data: data.values,
-                                backgroundColor: 'rgba(59, 130, 246, 0.6)',
-                                borderColor: 'rgb(59, 130, 246)',
-                                borderWidth: 1,
-                                borderRadius: 4,
-                                barPercentage: 1.0,
-                                categoryPercentage: 0.9
+                                backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                                borderRadius: 12
                             }]
                         },
                         options: {
@@ -364,44 +317,6 @@
                 }
             }
         });
-
-        // Polling dinâmico
-        function startPolling(interval) {
-            if (pollingIntervalId) clearInterval(pollingIntervalId);
-            
-            const ms = interval || {{ config.presentation.update_interval_ms }};
-            pollingIntervalId = setInterval(() => {
-                $cruLoadContainer(document.getElementById('stats-container'));
-                $cruLoadContainer(document.getElementById('histogram-trigger'));
-            }, ms);
-        }
-
-        // Lógica de atualização automática dos campos técnicos baseada no MCU
-        const mcuSelect = document.getElementById('setup-mcu');
-        const vrefInput = document.getElementById('setup-vref');
-        const adcMaxInput = document.getElementById('setup-adcmax');
-
-        const presets = {
-            'arduino_uno': { vref: 1.1, adc: 1023 },
-            'esp32': { vref: 3.3, adc: 4095 }
-        };
-
-        mcuSelect.addEventListener('change', (e) => {
-            const preset = presets[e.target.value];
-            if (preset) {
-                vrefInput.value = preset.vref;
-                adcMaxInput.value = preset.adc;
-                
-                // Feedback visual de atualização
-                [vrefInput, adcMaxInput].forEach(el => {
-                    el.classList.add('ring-2', 'ring-blue-400');
-                    setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400'), 1000);
-                });
-            }
-        });
-
-        // Inicialização
-        checkStatus();
     </script>
 </body>
 </html>

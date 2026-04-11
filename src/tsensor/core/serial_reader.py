@@ -16,7 +16,7 @@ def serial_reading(
         app_status["connected"] = False
         app_status["error"] = str(e)
         logger.error(f"Erro ao abrir porta serial {port}: {e}")
-        return
+        return None
 
     logger.info("Iniciando coleta...")
 
@@ -26,5 +26,5 @@ def serial_reading(
 
     ser.close()
     logger.info(
-        f"Coleta finalizada: {len(stream_manager.count_samples)} amostras",
+        f"Coleta finalizada: {stream_manager.count_samples} amostras",
     )

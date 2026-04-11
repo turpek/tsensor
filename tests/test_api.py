@@ -4,7 +4,6 @@ from tsensor.core.data_stream import DataStream
 from tsensor.extensions import data_stream, buffer_stream
 from tsensor.core.utils import MCU_PRESETS
 
-
 def test_api_status_returns_connection_state(client, mocker):
     """Verifica se a rota /api/status retorna o estado global da aplicação."""
     mock_status = {
@@ -116,7 +115,7 @@ def test_api_config_updates_values_and_calls_save(client, mocker):
 def test_api_config_saves_and_applies_presets(mocker, client):
     """Valida se a rota /api/config aplica presets de hardware ao trocar MCU."""
     mock_save = mocker.patch("tsensor.routes.api.save_config")
-
+    
     # Mock do config atual para garantir transição
     mock_config = {
         "hardware": {"port": "/dev/ttyUSB0", "mcu": "arduino_uno", "baudrate": 9600},
@@ -155,6 +154,69 @@ def test_api_restart_clears_data_and_restarts_acquisition(client, mocker):
 
     assert response.status_code == 200
     assert response.json["success"] is True
-
+    
     assert len(data_stream) == 0
     assert len(buffer_stream) == 0
+
+
+@pytest.fixture
+def mock_export_config(mocker):
+    """Fixture para mockar a configuração de exportação."""
+    mock_cfg = {
+        "exporter": {
+            "google_drive": {
+                "credentials_file": "c.json",
+                "token_file": "t.json",
+                "scopes": ["s"],
+                "file_name": "f"
+            }
+        }
+    }
+    mocker.patch("tsensor.routes.api.config", mock_cfg)
+    return mock_cfg
+
+
+def test_api_export_success(client, mocker, mock_export_config):
+    """Verifica se /api/export chama o exportador corretamente com sucesso."""
+    mock_stream = mocker.patch("tsensor.routes.api.data_stream")
+    type(mock_stream).sample = mocker.PropertyMock(return_value=[("10:00:01", 25.0)])
+
+    mock_exporter_cls = mocker.patch("tsensor.routes.api.GoogleDriveExporter")
+    mock_exporter_inst = mock_exporter_cls.return_value
+    mock_exporter_inst.export.return_value = True
+
+    response = client.post("/api/export")
+
+    assert response.status_code == 200
+    assert response.json["success"] is True
+    mock_exporter_inst.setup.assert_called_once()
+    mock_exporter_inst.export.assert_called_once()
+
+
+def test_api_export_no_data_fails(client, mocker, mock_export_config):
+    """Verifica se /api/export falha quando não há dados no stream."""
+    mock_stream = mocker.patch("tsensor.routes.api.data_stream")
+    type(mock_stream).sample = mocker.PropertyMock(return_value=[])
+    
+    # Mock do exportador para evitar execução de código real
+    mocker.patch("tsensor.routes.api.GoogleDriveExporter")
+
+    response = client.post("/api/export")
+
+    assert response.status_code == 400
+    assert "Não há dados" in response.json["error"]
+
+
+def test_api_export_service_failure(client, mocker, mock_export_config):
+    """Verifica se /api/export retorna erro quando o exportador falha."""
+    mock_stream = mocker.patch("tsensor.routes.api.data_stream")
+    type(mock_stream).sample = mocker.PropertyMock(return_value=[("10:00:01", 25.0)])
+
+    mock_exporter_cls = mocker.patch("tsensor.routes.api.GoogleDriveExporter")
+    mock_exporter_inst = mock_exporter_cls.return_value
+    mock_exporter_inst.export.return_value = False
+
+    response = client.post("/api/export")
+
+    assert response.status_code == 500
+    assert "Falha no upload" in response.json["error"]

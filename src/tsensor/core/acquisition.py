@@ -39,30 +39,36 @@ def start_acquisition():
             return
 
         def run(manager):
-            sensor_type = config["sensor"]["type"]
-            if sensor_type not in HANDLERS:
-                logger.error(f"Tipo de sensor desconhecido: {sensor_type}")
-                return
+            try:
+                sensor_type = config["sensor"]["type"]
+                if sensor_type not in HANDLERS:
+                    logger.error(f"Tipo de sensor desconhecido: {sensor_type}")
+                    return
 
-            handler_cls = HANDLERS[sensor_type]
+                handler_cls = HANDLERS[sensor_type]
 
-            manager.add_handler(
-                TEMP_NAME,
-                handler_cls,
-                data_stream,
-                buffer_stream,
-            )
+                manager.add_handler(
+                    TEMP_NAME,
+                    handler_cls,
+                    data_stream,
+                    buffer_stream,
+                )
 
-            logger.info(
-                f"Iniciando tentativa de conexão em {config['hardware']['port']}..."
-            )
-            serial_reading(
-                port=config["hardware"]["port"],
-                baudrate=config["hardware"]["baudrate"],
-                samples=config["acquisition"]["total_samples"],
-                stream_manager=manager,
-                timeout=config["hardware"]["timeout"],
-            )
+                logger.info(
+                    f"Iniciando tentativa de conexão em {config['hardware']['port']}..."
+                )
+                serial_reading(
+                    port=config["hardware"]["port"],
+                    baudrate=config["hardware"]["baudrate"],
+                    samples=config["acquisition"]["total_samples"],
+                    stream_manager=manager,
+                    timeout=config["hardware"]["timeout"],
+                )
+            except Exception as e:
+                logger.error(f"Erro crítico na thread de aquisição: {e}")
+            finally:
+                global _current_manager
+                _current_manager = None
 
         _current_manager = StreamManager(
             samples=config["acquisition"]["total_samples"],
