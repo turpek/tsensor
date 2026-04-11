@@ -171,3 +171,23 @@ def test_datastream_histogram_idx_limite_superior():
     last_label = list(hist.keys())[-1]
     # O valor máximo deve estar no último bin
     assert hist[last_label] >= 1
+
+
+def test_datastream_histogram_zero_division_outliers():
+    """
+    Reproduz o ZeroDivisionError no método histogram.
+    Ocorre quando outliers são removidos e o que sobra tem amplitude zero.
+    """
+    stream = DataStream(total_samples=100)
+
+    # Dados com IQR = 0 (Q1=20, Q3=20)
+    for _ in range(10):
+        stream.add(20.0, timestamp="10:00:00:000")
+
+    stream.add(50.0, timestamp="10:00:00:000")  # Outlier superior
+    stream.add(-10.0, timestamp="10:00:00:000")  # Outlier inferior
+
+    # Se amplitude_visual == 0 após filtro, deve retornar 1 bin em vez de explodir
+    hist = stream.histogram(resolucao_adc=0.1)
+    assert "20.0" in hist
+    assert hist["20.0"] == 10

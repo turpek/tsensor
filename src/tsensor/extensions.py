@@ -11,3 +11,11 @@ TOTA_TEMPORAL_SAMPLES = config["acquisition"]["buffer_samples"]
 data_stream = DataStream(total_samples=TOTAL_SAMPLES)
 buffer_stream = DataStream(total_samples=TOTA_TEMPORAL_SAMPLES)
 history_stream = DataStream(total_samples=TOTA_TEMPORAL_SAMPLES)
+
+# Estado global da aplicação
+app_status = {
+    "connected": False,
+    "port": config["hardware"]["port"],
+    "mcu": config["hardware"]["mcu"],
+    "error": None,
+}

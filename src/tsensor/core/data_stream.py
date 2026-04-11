@@ -106,7 +106,7 @@ class DataStream:
         h_ideal = max(h_fd, resolucao_adc)
 
         k = max(5, ceil(amplitude_visual / h_ideal))
-        h_real = amplitude_visual / k if k > 0 else h_ideal
+        h_real = amplitude_visual / k if amplitude_visual > 0 else h_ideal
 
         labels_list = [
             f"{(min_visual + i * h_real):.{decimal_label}f}" for i in range(k)

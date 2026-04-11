@@ -34,3 +34,4 @@
 3. **Performance:** O processamento deve suportar volumes de dados (ex: 1.000.000 amostras) sem degradação do frame rate do dashboard.
 4. **Acoplamento:** Mantenha a lógica de negócio (DataStream) isolada da lógica de transporte (Serial/Flask).
 5. **Codificação**: Você ficara responsavel pelo front e testes, não é para mexer com backend.
+6. **Teste**: usar o pytest, para o mock usar o pytest-mock.

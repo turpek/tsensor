@@ -1,26 +1,22 @@
-# Configurações do Sistema de Monitoramento de Temperatura (tsensor)
-
 [hardware]
 port = "/dev/ttyACM0"
 baudrate = 115200
 timeout = 1.0
-mcu = "arduino_uno"   # Opções: "arduino_uno", "esp32"
+mcu = "arduino_uno"
 
 [sensor]
-type = "LM35"         # Opções: "LM35" ou "NTC"
-# Se omitidos, adc_max e v_ref usarão os padrões do MCU escolhido
+type = "LM35"
 adc_max = 1023
 v_ref = 1.1
 
 [acquisition]
 total_samples = 1000000
-buffer_samples = 1000       # Amostras para o gráfico de linha (tempo real)
-max_runtime_sec = 1800      # Tempo limite de coleta (30 minutos)
+buffer_samples = 1000
+max_runtime_sec = 1800
 
 [presentation]
-log_level = "DEBUG"
+log_level = "INFO"
 decimal_places = 1
-update_interval_ms = 1000   # Intervalo de atualização do dashboard em milissegundos
+update_interval_ms = 1000
 flask_port = 5000
-
-debug_mode = true
+debug_mode = false

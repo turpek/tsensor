@@ -1,7 +1,62 @@
-from flask import Blueprint, render_template, jsonify
-from tsensor.extensions import data_stream, config
+from flask import Blueprint, render_template, jsonify, request
+from tsensor.extensions import data_stream, config, app_status
+from tsensor.core.utils import save_config, MCU_PRESETS
+from tsensor.core.acquisition import start_acquisition
 
 api_route = Blueprint("api", __name__, url_prefix="/api")
+
+
+@api_route.route("/status", methods=["GET"])
+def get_status():
+    """Retorna o estado da conexão e configurações atuais."""
+    return jsonify(app_status)
+
+
+@api_route.route("/config", methods=["POST"])
+def update_config():
+    """Recebe novas configurações do frontend e salva no TOML."""
+    data = request.json
+    if not data:
+        return jsonify({"error": "Dados inválidos"}), 400
+
+    # Atualiza configurações de hardware
+    config["hardware"]["port"] = data.get("port", config["hardware"]["port"])
+    config["hardware"]["mcu"] = data.get("mcu", config["hardware"]["mcu"])
+    config["hardware"]["baudrate"] = int(
+        data.get("baudrate", config["hardware"]["baudrate"])
+    )
+
+    # Atualiza configurações de aquisição e apresentação
+    config["acquisition"]["total_samples"] = int(
+        data.get("total_samples", config["acquisition"]["total_samples"])
+    )
+    config["presentation"]["update_interval_ms"] = int(
+        data.get("update_interval_ms", config["presentation"]["update_interval_ms"])
+    )
+    config["presentation"]["decimal_places"] = int(
+        data.get("decimal_places", config["presentation"]["decimal_places"])
+    )
+
+    # Prioriza valores manuais de sensor se fornecidos, senão usa presets
+    config["sensor"]["v_ref"] = float(data.get("v_ref", config["sensor"]["v_ref"]))
+    config["sensor"]["adc_max"] = int(data.get("adc_max", config["sensor"]["adc_max"]))
+
+    try:
+        save_config(config)
+
+        # Atualiza status global para refletir tentativa de troca
+        app_status["port"] = config["hardware"]["port"]
+        app_status["mcu"] = config["hardware"]["mcu"]
+        app_status["error"] = None
+
+        # Dispara a aquisição na nova porta/configuração
+        start_acquisition()
+
+        return jsonify(
+            {"success": True, "message": "Configuração salva. Reiniciando aquisição..."}
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @api_route.route("/stats", methods=["GET"])
