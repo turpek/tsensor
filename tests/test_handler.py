@@ -1,14 +1,19 @@
 import time
 import pytest
-from tsensor.core.handlers import NTCHandler, LM35Handler
+from tsensor.core.handlers import NTCHandler, LM35Handler, StreamManager
 from tsensor.core.data_stream import DataStream
+
+# --- FIXTURES ---
 
 
 @pytest.fixture
-def handler():
-    """Configura uma instância de NTCHandler para testes (ADC 12-bit, 3.3V)."""
-    data = DataStream(total_samples=100)
-    temporal_data = DataStream(total_samples=100)
+def data_streams():
+    return DataStream(total_samples=100), DataStream(total_samples=100)
+
+
+@pytest.fixture
+def ntc_handler(data_streams):
+    data, temporal_data = data_streams
     return NTCHandler(
         data=data,
         temporal_data=temporal_data,
@@ -19,103 +24,9 @@ def handler():
     )
 
 
-def test_ntc_handler_initially_is_active(handler):
-    """Verifica se o handler inicia como ativo."""
-    assert handler.is_active is True
-
-
-def test_ntc_handler_becomes_inactive_after_timeout():
-    """Verifica se o handler fica inativo após o tempo de timeout (0.1s) expirar sem dados."""
-    data = DataStream(total_samples=100)
-    temporal_data = DataStream(total_samples=100)
-
-    # Timeout de 0.1 segundo para o teste ser ultrarrápido
-    handler = NTCHandler(
-        data=data,
-        temporal_data=temporal_data,
-        samples=10,
-        timeout=0.1,
-        adc_max=4095,
-        v_ref=3.3,
-    )
-
-    # Inicialmente ativo
-    assert handler.is_active is True
-
-    # Aguarda o timeout (com pequena margem)
-    time.sleep(0.15)
-
-    # Deve ficar inativo
-    assert handler.is_active is False
-
-
-def test_ntc_handler_becomes_inactive_after_reaching_samples(handler, mocker):
-    """Verifica se o handler fica inativo após atingir o número máximo de amostras."""
-    # 1. Setup do Mock para o atributo data
-    # Mockando len(self._data) para retornar o limite de samples (10)
-    mock_data = mocker.MagicMock(spec=DataStream)
-    mock_data.__len__.return_value = 10
-
-    # Injetando o mock no handler
-    handler._data = mock_data
-
-    # 2. Assert: is_active deve ser False agora
-    assert handler.is_active is False
-
-
-def test_ntc_handler_handle_valid_data(handler):
-    """Verifica se o método handle processa corretamente a string '2025' resultando em aprox. 25.5°C."""
-    # 1. Execução: handle do valor ADC 2025 (Ref 3.3V, 12-bit)
-    handler.handle("2025")
-
-    # 2. Asserts
-    assert len(handler.temporal_data) == 1
-    assert len(handler.data) == 1
-
-    # Valida se houve a inserção da temperatura correta (aprox 25.5)
-    _, val_temp = handler.temporal_data.sample[0]
-    _, val_data = handler.data.sample[0]
-
-    assert val_temp == pytest.approx(25.5, abs=0.5)
-    assert val_data == pytest.approx(25.5, abs=0.5)
-
-
-def test_ntc_handler_handle_limits_adc(handler):
-    """Verifica se o método handle ignora os limites de ADC (0 e 4095)."""
-    # 1. Execução: envia 0 (inferior) e 4095 (superior)
-    handler.handle("0")
-    handler.handle("4095")
-
-    # 2. Asserts: o tamanho deve continuar em 0
-    assert len(handler.temporal_data) == 0
-    assert len(handler.data) == 0
-
-
-def test_ntc_handler_handle_empty_string(handler):
-    """Verifica se o método handle ignora strings vazias."""
-    handler.handle("")
-    assert len(handler.temporal_data) == 0
-    assert len(handler.data) == 0
-
-
-def test_ntc_handler_handle_invalid_string(handler):
-    """Verifica se o método handle ignora strings não numéricas sem quebrar."""
-    # Deve ignorar e não levantar exceção (ValueError)
-    handler.handle("abc")
-    handler.handle("25.5.5")
-
-    assert len(handler.temporal_data) == 0
-    assert len(handler.data) == 0
-
-
-# --- TESTES PARA LM35Handler ---
-
-
 @pytest.fixture
-def lm35_handler():
-    """Configura uma instância de LM35Handler para testes (Arduino 10-bit, 1.1V)."""
-    data = DataStream(total_samples=100)
-    temporal_data = DataStream(total_samples=100)
+def lm35_handler(data_streams):
+    data, temporal_data = data_streams
     return LM35Handler(
         data=data,
         temporal_data=temporal_data,
@@ -126,46 +37,120 @@ def lm35_handler():
     )
 
 
-def test_lm35_handler_conversion(lm35_handler):
-    """
-    Verifica a conversão de ADC para temperatura no LM35 (1.1V/10bits).
-    205 ADC -> (205/1023)*1.1 = 0.2204V -> 22.04°C
-    51 ADC -> (51/1023)*1.1 = 0.0548V -> 5.48°C
-    """
-    lm35_handler.handle("205")
-    lm35_handler.handle("51")
-
-    assert len(lm35_handler.data) == 2
-
-    _, temp1 = lm35_handler.data.sample[0]
-    _, temp2 = lm35_handler.data.sample[1]
-
-    assert temp1 == pytest.approx(22.04, abs=0.1)
-    assert temp2 == pytest.approx(5.48, abs=0.1)
+@pytest.fixture
+def stream_manager():
+    return StreamManager(samples=10, timeout=1, adc_max=4095, v_ref=3.3)
 
 
-def test_lm35_handler_limits_adc(lm35_handler):
-    """Verifica se o LM35Handler ignora os limites de ADC (0 e 1023)."""
-    lm35_handler.handle("0")
-    lm35_handler.handle("1023")
-    lm35_handler.handle("-1")
-    lm35_handler.handle("1024")
-
-    assert len(lm35_handler.data) == 0
+# --- TESTES PARA HANDLERS (FOCO: PARSING E CONVERSÃO) ---
 
 
-def test_lm35_handler_invalid_input(lm35_handler):
-    """Verifica se o LM35Handler ignora entradas inválidas."""
-    lm35_handler.handle("temperatura")
-    lm35_handler.handle("")
+def test_ntc_handler_handle_valid_data_with_prefix(ntc_handler):
+    """Verifica se o NTCHandler processa corretamente a string 'T=2025'."""
+    ntc_handler.handle("T=2025")
+    assert len(ntc_handler.data) == 1
+    _, val = ntc_handler.data.sample[0]
+    assert val == pytest.approx(25.5, abs=0.5)
 
-    assert len(lm35_handler.data) == 0
+
+def test_ntc_handler_ignores_noise_without_prefix(ntc_handler):
+    """Verifica se o handler ignora strings que não seguem o padrão 'T='."""
+    ntc_handler.handle("2025")  # Sem prefixo
+    ntc_handler.handle("X=2025")  # Prefixo errado
+    assert len(ntc_handler.data) == 0
 
 
-def test_lm35_handler_is_active_by_samples(lm35_handler, mocker):
-    """Verifica se o LM35Handler fica inativo após atingir o número máximo de amostras."""
-    mock_data = mocker.MagicMock(spec=DataStream)
-    mock_data.__len__.return_value = 10
-    lm35_handler._data = mock_data
+def test_ntc_handler_limits_adc(ntc_handler):
+    """Verifica se o handler ignora limites de ADC."""
+    ntc_handler.handle("T=0")
+    ntc_handler.handle("T=4095")
+    assert len(ntc_handler.data) == 0
 
-    assert lm35_handler.is_active is False
+
+def test_lm35_handler_conversion_with_prefix(lm35_handler):
+    """Verifica conversão do LM35 com o prefixo 'T='."""
+    lm35_handler.handle("T=205")  # (205/1023)*1.1*100 = 22.04
+    _, val = lm35_handler.data.sample[0]
+    assert val == pytest.approx(22.04, abs=0.1)
+
+
+# --- TESTES PARA STREAMMANAGER (FOCO: ORQUESTRAÇÃO) ---
+
+
+def test_stream_manager_initially_active(stream_manager):
+    assert stream_manager.is_active is True
+
+
+def test_stream_manager_stop(stream_manager):
+    stream_manager.stop()
+    assert stream_manager.is_active is False
+
+
+def test_stream_manager_timeout():
+    manager = StreamManager(samples=10, timeout=0.1, adc_max=1023, v_ref=1.1)
+    assert manager.is_active is True
+    time.sleep(0.15)
+    assert manager.is_active is False
+
+
+def test_stream_manager_add_and_get_handler(stream_manager, data_streams):
+    data, temp = data_streams
+    stream_manager.add_handler("temp_sensor", LM35Handler, data, temp)
+
+    handler = stream_manager.get_handler("temp_sensor")
+    assert isinstance(handler, LM35Handler)
+    assert handler.data == data
+
+
+def test_stream_manager_dispatch_to_multiple_handlers(stream_manager, data_streams):
+    """Verifica se o dispatch entrega a linha para todos os handlers registrados."""
+    data1, temp1 = DataStream(10), DataStream(10)
+    data2, temp2 = DataStream(10), DataStream(10)
+
+    # Registra dois handlers (mesmo que sejam do mesmo tipo, para teste de dispatch)
+    stream_manager.add_handler("s1", LM35Handler, data1, temp1)
+    stream_manager.add_handler("s2", LM35Handler, data2, temp2)
+
+    # Dispatch de um valor válido para LM35 (ADC 10-bit, VRef 3.3v no manager)
+    # Nota: No StreamManager o v_ref é 3.3, então (512/1023)*3.3*100 = 165.1
+    stream_manager.dispatch("T=512")
+
+    assert len(data1) == 1
+    assert len(data2) == 1
+    _, v1 = data1.sample[0]
+    _, v2 = data2.sample[0]
+    assert v1 == v2
+
+
+def test_stream_manager_is_active_with_total_samples_limit():
+    """Verifica se o manager desativa após atingir o limite de amostras."""
+    limit = 5
+    manager = StreamManager(
+        samples=10, timeout=10, adc_max=4095, v_ref=3.3, total_samples=limit
+    )
+
+    # Adiciona um handler para podermos chamar o dispatch
+    data, temp = DataStream(10), DataStream(10)
+    manager.add_handler("s1", LM35Handler, data, temp)
+
+    # Estado inicial deve ser ativo
+    assert manager.is_active is True
+
+    # Simula o recebimento de amostras válidas
+    for i in range(limit):
+        assert manager.is_active is True, f"Deveria estar ativo na amostra {i}"
+        manager.dispatch("T=100")
+
+    # Após o limite, deve estar inativo
+    assert manager.is_active is False
+
+
+def test_stream_manager_is_active_without_total_samples():
+    """Verifica se o manager ignora o limite se total_samples for None."""
+    manager = StreamManager(
+        samples=10, timeout=10, adc_max=4095, v_ref=3.3, total_samples=None
+    )
+
+    for _ in range(100):
+        manager.dispatch("T=100")
+        assert manager.is_active is True

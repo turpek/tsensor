@@ -1,11 +1,11 @@
 from loguru import logger
 from serial import Serial, SerialException
-from tsensor.core.handlers import SerialHandler
+from tsensor.core.handlers import StreamManager
 from tsensor.extensions import app_status
 
 
 def serial_reading(
-    port: str, baudrate: int, samples: int, handler: SerialHandler, timeout: int = 1
+    port: str, baudrate: int, samples: int, stream_manager: StreamManager, timeout: int = 1
 ) -> None:
     try:
         ser = Serial(port, baudrate, timeout=timeout)
@@ -20,13 +20,9 @@ def serial_reading(
 
     logger.info("Iniciando coleta...")
 
-    while handler.is_active:
+    while stream_manager.is_active:
         line = ser.readline().decode("utf-8", errors="ignore").strip()
-        if line.startswith("T="):
-            # Passa apenas o valor numérico após o 'T='
-            handler.handle(line[2:])
-        elif line:
-            logger.debug(f"Descartando dado fora do protocolo: {line!r}")
+        stream_manager.dispatch(line)
 
     ser.close()
-    logger.info(f"Coleta finalizada: {len(handler.data)} amostras")
+    logger.info(f"Coleta finalizada: {len(stream_manager.count_samples)} amostras")

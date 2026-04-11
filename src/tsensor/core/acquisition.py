@@ -1,12 +1,14 @@
 import threading
 from loguru import logger
 from tsensor.extensions import data_stream, buffer_stream, config
-from tsensor.core.handlers import HANDLERS
+from tsensor.core.handlers import HANDLERS, StreamManager
 from tsensor.core.serial_reader import serial_reading
 
 # Controle global da thread
 _acquisition_thread = None
 _thread_lock = threading.Lock()
+
+TEMP_NAME = 'temperature'
 
 
 def start_acquisition():
@@ -27,13 +29,19 @@ def start_acquisition():
                 return
 
             handler_cls = HANDLERS[sensor_type]
-            handler = handler_cls(
-                data=data_stream,
-                temporal_data=buffer_stream,
+            stream_manager = StreamManager(
                 samples=config["acquisition"]["total_samples"],
                 timeout=config["acquisition"]["max_runtime_sec"],
                 adc_max=config["sensor"]["adc_max"],
                 v_ref=config["sensor"]["v_ref"],
+            )
+
+            stream_manager.add_handler(
+                TEMP_NAME,
+                handler_cls,
+                data_stream,
+                buffer_stream,
+
             )
 
             logger.info(
@@ -43,7 +51,7 @@ def start_acquisition():
                 port=config["hardware"]["port"],
                 baudrate=config["hardware"]["baudrate"],
                 samples=config["acquisition"]["total_samples"],
-                handler=handler,
+                stream_manager=stream_manager,
                 timeout=config["hardware"]["timeout"],
             )
 

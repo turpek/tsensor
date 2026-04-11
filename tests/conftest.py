@@ -1,6 +1,7 @@
 import pytest
 from tsensor.app import app
 
+
 @pytest.fixture(autouse=True)
 def disable_real_acquisition(mocker):
     """
@@ -9,6 +10,7 @@ def disable_real_acquisition(mocker):
     # Mocka na origem do core e na rota que a utiliza
     mocker.patch("tsensor.core.acquisition.start_acquisition")
     return mocker.patch("tsensor.routes.api.start_acquisition")
+
 
 @pytest.fixture
 def client():
