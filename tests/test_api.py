@@ -177,11 +177,11 @@ def mock_export_config(mocker):
 
 
 def test_api_export_success(client, mocker, mock_export_config):
-    """Verifica se /api/export chama o exportador corretamente com sucesso."""
+    """Verifica se /api/export chama o exportador CSV corretamente com sucesso."""
     mock_stream = mocker.patch("tsensor.routes.api.data_stream")
     type(mock_stream).sample = mocker.PropertyMock(return_value=[("10:00:01", 25.0)])
 
-    mock_exporter_cls = mocker.patch("tsensor.routes.api.GoogleDriveExporter")
+    mock_exporter_cls = mocker.patch("tsensor.routes.api.CSVExporter")
     mock_exporter_inst = mock_exporter_cls.return_value
     mock_exporter_inst.export.return_value = True
 
@@ -189,6 +189,7 @@ def test_api_export_success(client, mocker, mock_export_config):
 
     assert response.status_code == 200
     assert response.json["success"] is True
+    assert "Dados salvos" in response.json["message"]
     mock_exporter_inst.setup.assert_called_once()
     mock_exporter_inst.export.assert_called_once()
 
@@ -199,7 +200,7 @@ def test_api_export_no_data_fails(client, mocker, mock_export_config):
     type(mock_stream).sample = mocker.PropertyMock(return_value=[])
     
     # Mock do exportador para evitar execução de código real
-    mocker.patch("tsensor.routes.api.GoogleDriveExporter")
+    mocker.patch("tsensor.routes.api.CSVExporter")
 
     response = client.post("/api/export")
 
@@ -208,15 +209,15 @@ def test_api_export_no_data_fails(client, mocker, mock_export_config):
 
 
 def test_api_export_service_failure(client, mocker, mock_export_config):
-    """Verifica se /api/export retorna erro quando o exportador falha."""
+    """Verifica se /api/export retorna erro quando o exportador CSV falha."""
     mock_stream = mocker.patch("tsensor.routes.api.data_stream")
     type(mock_stream).sample = mocker.PropertyMock(return_value=[("10:00:01", 25.0)])
 
-    mock_exporter_cls = mocker.patch("tsensor.routes.api.GoogleDriveExporter")
+    mock_exporter_cls = mocker.patch("tsensor.routes.api.CSVExporter")
     mock_exporter_inst = mock_exporter_cls.return_value
     mock_exporter_inst.export.return_value = False
 
     response = client.post("/api/export")
 
     assert response.status_code == 500
-    assert "Falha no upload" in response.json["error"]
+    assert "Falha ao salvar" in response.json["error"]

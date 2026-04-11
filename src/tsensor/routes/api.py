@@ -2,43 +2,46 @@ from flask import Blueprint, render_template, jsonify, request
 from tsensor.extensions import data_stream, buffer_stream, config, app_status
 from tsensor.core.utils import save_config, MCU_PRESETS
 from tsensor.core.acquisition import start_acquisition, stop_acquisition
-
-from tsensor.core.exporters import GoogleDriveExporter
+from tsensor.core.exporters import CSVExporter
 
 api_route = Blueprint("api", __name__, url_prefix="/api")
-...
+
+
 @api_route.route("/export", methods=["POST"])
 def export_data():
-    """Exporta os dados atuais para o Google Drive."""
+    """Exporta os dados atuais para um arquivo CSV local."""
     try:
-        drive_config = config["exporter"]["google_drive"]
-        
-        exporter = GoogleDriveExporter(
-            credentials_path=drive_config["credentials_file"],
-            token_path=drive_config["token_file"],
-            scopes=drive_config["scopes"],
+        # Usa a pasta de exportação do sistema ou uma pasta 'exports' por padrão
+        export_dir = "exports"
+
+        exporter = CSVExporter(
+            directory=export_dir,
             header=["timestamp", "temperatura"]
         )
-        
-        # Prepara a conexão (OAuth)
+
+        # Garante que a pasta existe
         exporter.setup()
-        
+
         # Obtém os dados atuais do stream
         data = data_stream.sample
-        
+
         if not data:
             return jsonify({"error": "Não há dados para exportar."}), 400
-            
-        # Realiza o upload
-        success = exporter.export(data, drive_config["file_name"])
-        
+
+        # Realiza a exportação (usa um nome baseado no timestamp)
+        from datetime import datetime
+        file_name = f"sessao_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+        success = exporter.export(data, file_name)
+
         if success:
-            return jsonify({"success": True, "message": "Dados exportados."})
+            return jsonify({"success": True, "message": f"Dados salvos em {export_dir}/{file_name}.csv"})
         else:
-            return jsonify({"error": "Falha no upload para o Drive."}), 500
-            
+            return jsonify({"error": "Falha ao salvar arquivo CSV."}), 500
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 @api_route.route("/status", methods=["GET"])

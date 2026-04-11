@@ -254,13 +254,13 @@
             });
 
             document.getElementById('export-btn').addEventListener('click', async () => {
-                if (!confirm("Exportar dados agora para o Google Drive?")) return;
+                if (!confirm("Exportar dados agora para arquivo CSV local?")) return;
                 const btn = document.getElementById('export-btn');
                 btn.disabled = true;
                 try {
                     const res = await fetch('/api/export', { method: 'POST' });
                     const result = await res.json();
-                    alert(result.success ? "Dados exportados com sucesso!" : "Falha: " + result.error);
+                    alert(result.success ? "Exportação finalizada! " + result.message : "Falha: " + result.error);
                 } catch (e) { alert("Erro de comunicação."); }
                 btn.disabled = false;
             });
