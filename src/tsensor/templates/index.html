@@ -11,99 +11,131 @@
 <body class="bg-slate-50 min-h-screen font-sans text-slate-900">
 
     <!-- Setup Overlay (Exibido se a conexão falhar) -->
-    <div id="setup-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 border border-slate-200 overflow-y-auto max-h-[90vh]">
-            <div class="flex flex-col items-center text-center mb-6">
-                <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-3">
-                    <i class="bi bi-gear-fill text-2xl"></i>
+    <div id="setup-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-slate-200 overflow-hidden flex flex-col md:flex-row">
+            
+            <!-- Lateral Esquerda: Info & Status -->
+            <div class="bg-slate-50 p-8 md:w-1/3 border-r border-slate-100 flex flex-col justify-between">
+                <div>
+                    <div class="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-200">
+                        <i class="bi bi-sliders2-vertical text-3xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-black text-slate-800 leading-tight mb-4">Ajustes do <span class="text-blue-600">Sistema</span></h2>
+                    <p class="text-slate-500 text-sm leading-relaxed">Configure os parâmetros de comunicação serial e interface para iniciar a monitoração em tempo real.</p>
                 </div>
-                <h2 class="text-xl font-bold text-slate-800">Configurações do Sistema</h2>
-                <p class="text-sm text-slate-500">Ajuste os parâmetros de hardware e visualização.</p>
+
+                <div class="mt-8 space-y-4">
+                    <div class="flex items-start gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
+                        <i class="bi bi-info-circle-fill text-blue-500 mt-0.5"></i>
+                        <p class="text-xs text-slate-600">As alterações serão aplicadas e o dashboard será reiniciado automaticamente.</p>
+                    </div>
+                </div>
             </div>
 
-            <form id="setup-form" class="space-y-6">
-                <!-- Seção: Hardware -->
-                <div class="space-y-4">
-                    <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Hardware & Conexão</h3>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Porta Serial</label>
-                        <div class="relative">
-                            <i class="bi bi-usb-symbol absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-                            <input type="text" name="port" id="setup-port" value="{{ config.hardware.port }}"
-                                   class="w-full pl-10 pr-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm">
+            <!-- Lateral Direita: Formulário em Grid -->
+            <div class="p-8 md:w-2/3 bg-white overflow-y-auto max-h-[85vh]">
+                <form id="setup-form" class="space-y-8">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                        
+                        <!-- Coluna 1: Hardware -->
+                        <div class="space-y-5">
+                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <i class="bi bi-cpu"></i> Hardware & Conexão
+                            </h3>
+                            
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Porta Serial</label>
+                                    <div class="relative group">
+                                        <i class="bi bi-usb-symbol absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg transition-colors group-focus-within:text-blue-500"></i>
+                                        <input type="text" name="port" id="setup-port" value="{{ config.hardware.port }}"
+                                               class="w-full pl-10 pr-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-slate-50/50">
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">MCU</label>
+                                        <select name="mcu" id="setup-mcu" 
+                                                class="w-full px-3 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-slate-50/50">
+                                            <option value="arduino_uno" {% if config.hardware.mcu == 'arduino_uno' %}selected{% endif %}>Uno</option>
+                                            <option value="esp32" {% if config.hardware.mcu == 'esp32' %}selected{% endif %}>ESP32</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Baudrate</label>
+                                        <select name="baudrate" id="setup-baudrate"
+                                                class="w-full px-3 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-slate-50/50">
+                                            <option value="9600" {% if config.hardware.baudrate == 9600 %}selected{% endif %}>9600</option>
+                                            <option value="115200" {% if config.hardware.baudrate == 115200 %}selected{% endif %}>115200</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">V_Ref (V)</label>
+                                        <input type="number" step="0.1" name="v_ref" id="setup-vref" value="{{ config.sensor.v_ref }}"
+                                               class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-white font-mono">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">ADC Max</label>
+                                        <input type="number" name="adc_max" id="setup-adcmax" value="{{ config.sensor.adc_max }}"
+                                               class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-white font-mono">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Coluna 2: Aquisição & Interface -->
+                        <div class="space-y-6">
+                            <!-- Aquisição -->
+                            <div class="space-y-4">
+                                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <i class="bi bi-database-down"></i> Amostragem
+                                </h3>
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Tamanho do Buffer (N)</label>
+                                    <input type="number" name="total_samples" value="{{ config.acquisition.total_samples }}"
+                                           class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-slate-50/50">
+                                </div>
+                            </div>
+
+                            <!-- Interface -->
+                            <div class="space-y-4 pt-2">
+                                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <i class="bi bi-palette"></i> Apresentação
+                                </h3>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Update (ms)</label>
+                                        <input type="number" name="update_interval_ms" value="{{ config.presentation.update_interval_ms }}"
+                                               class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-slate-50/50">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Decimais</label>
+                                        <input type="number" name="decimal_places" value="{{ config.presentation.decimal_places }}" min="0" max="4"
+                                               class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all bg-slate-50/50">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Microcontrolador</label>
-                            <select name="mcu" id="setup-mcu" 
-                                    class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm">
-                                <option value="arduino_uno" {% if config.hardware.mcu == 'arduino_uno' %}selected{% endif %}>Arduino Uno</option>
-                                <option value="esp32" {% if config.hardware.mcu == 'esp32' %}selected{% endif %}>ESP32</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Baudrate</label>
-                            <select name="baudrate" id="setup-baudrate"
-                                    class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm">
-                                <option value="9600" {% if config.hardware.baudrate == 9600 %}selected{% endif %}>9600</option>
-                                <option value="115200" {% if config.hardware.baudrate == 115200 %}selected{% endif %}>115200</option>
-                            </select>
-                        </div>
+                    <div class="pt-6 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <p id="setup-error" class="text-sm text-red-600 font-semibold flex items-center gap-2 hidden">
+                            <i class="bi bi-exclamation-triangle-fill"></i> <span></span>
+                        </p>
+                        <div class="flex-grow"></div>
+                        <button type="submit" id="setup-submit"
+                                class="w-full md:w-auto min-w-[200px] bg-slate-900 hover:bg-black text-white font-black py-4 px-8 rounded-2xl transition-all shadow-xl hover:shadow-2xl active:scale-95 flex items-center justify-center gap-3 group">
+                            <span>SALVAR AJUSTES</span>
+                            <i class="bi bi-arrow-right-circle text-xl group-hover:translate-x-1 transition-transform"></i>
+                        </button>
                     </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">V_Ref (Volts)</label>
-                            <input type="number" step="0.1" name="v_ref" id="setup-vref" value="{{ config.sensor.v_ref }}"
-                                   class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm bg-slate-50">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">ADC Max (Bits)</label>
-                            <input type="number" name="adc_max" id="setup-adcmax" value="{{ config.sensor.adc_max }}"
-                                   class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm bg-slate-50">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Seção: Aquisição -->
-                <div class="space-y-4">
-                    <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Aquisição de Dados</h3>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Amostras Totais (Buffer)</label>
-                        <input type="number" name="total_samples" value="{{ config.acquisition.total_samples }}"
-                               class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm">
-                    </div>
-                </div>
-
-                <!-- Seção: Interface -->
-                <div class="space-y-4">
-                    <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Interface & Dashboard</h3>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Atualização (ms)</label>
-                            <input type="number" name="update_interval_ms" value="{{ config.presentation.update_interval_ms }}"
-                                   class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Casas Decimais</label>
-                            <input type="number" name="decimal_places" value="{{ config.presentation.decimal_places }}" min="0" max="4"
-                                   class="w-full px-4 py-3 text-base border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="pt-2">
-                    <button type="submit" id="setup-submit"
-                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 group">
-                        <span>SALVAR E CONECTAR</span>
-                        <i class="bi bi-check-circle group-hover:scale-110 transition-transform"></i>
-                    </button>
-                </div>
-            </form>
-            
-            <p id="setup-error" class="mt-4 text-xs text-red-600 font-medium text-center hidden"></p>
+                </form>
+            </div>
         </div>
     </div>
 
