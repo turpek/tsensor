@@ -120,6 +120,8 @@ def test_api_config_updates_values_and_calls_save(client, mocker):
     mock_config = {
         "hardware": {"port": "/old/port", "mcu": "arduino_uno", "baudrate": 9600},
         "sensor": {"adc_max": 1023, "v_ref": 1.1},
+        "acquisition": {"total_samples": 1000},
+        "presentation": {"update_interval_ms": 500, "decimal_places": 2},
     }
     mocker.patch("tsensor.routes.api.config", mock_config)
     mock_save = mocker.patch("tsensor.routes.api.save_config")

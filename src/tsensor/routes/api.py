@@ -20,11 +20,25 @@ def update_config():
         return jsonify({"error": "Dados inválidos"}), 400
 
     # Atualiza configurações de hardware
+    old_mcu = config["hardware"]["mcu"]
+    new_mcu = data.get("mcu", config["hardware"]["mcu"])
     config["hardware"]["port"] = data.get("port", config["hardware"]["port"])
-    config["hardware"]["mcu"] = data.get("mcu", config["hardware"]["mcu"])
+    config["hardware"]["mcu"] = new_mcu
     config["hardware"]["baudrate"] = int(
         data.get("baudrate", config["hardware"]["baudrate"])
     )
+
+    # Se o MCU mudou, aplica presets automáticos se não houver sobrescrita no payload
+    if new_mcu != old_mcu and new_mcu in MCU_PRESETS:
+        preset = MCU_PRESETS[new_mcu]
+        config["sensor"]["v_ref"] = float(data.get("v_ref", preset["v_ref"]))
+        config["sensor"]["adc_max"] = int(data.get("adc_max", preset["adc_max"]))
+    else:
+        # Mantém lógica atual para quando o MCU não muda
+        config["sensor"]["v_ref"] = float(data.get("v_ref", config["sensor"]["v_ref"]))
+        config["sensor"]["adc_max"] = int(
+            data.get("adc_max", config["sensor"]["adc_max"])
+        )
 
     # Atualiza configurações de aquisição e apresentação
     config["acquisition"]["total_samples"] = int(
@@ -36,10 +50,6 @@ def update_config():
     config["presentation"]["decimal_places"] = int(
         data.get("decimal_places", config["presentation"]["decimal_places"])
     )
-
-    # Prioriza valores manuais de sensor se fornecidos, senão usa presets
-    config["sensor"]["v_ref"] = float(data.get("v_ref", config["sensor"]["v_ref"]))
-    config["sensor"]["adc_max"] = int(data.get("adc_max", config["sensor"]["adc_max"]))
 
     try:
         save_config(config)
@@ -53,9 +63,7 @@ def update_config():
         if not app_status.get("connected"):
             start_acquisition()
 
-        return jsonify(
-            {"success": True, "message": "Configurações salvas."}
-        )
+        return jsonify({"success": True, "message": "Configurações salvas."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
