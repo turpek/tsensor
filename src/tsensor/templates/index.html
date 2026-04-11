@@ -150,12 +150,18 @@
                 <i class="bi bi-cpu text-blue-400 text-2xl"></i>
                 <h1 class="text-xl font-bold tracking-tight">TSENSOR <span class="text-blue-400 text-sm font-normal">v1.0</span></h1>
             </div>
-            <div class="flex items-center gap-6 text-sm font-medium">
+            <div class="flex items-center gap-4 text-sm font-medium">
                 <span class="flex items-center gap-1.5"><i class="bi bi-circle-fill text-green-500 text-[10px] animate-pulse"></i> LIVE</span>
-                <button id="open-setup" class="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-all border border-slate-600 active:scale-95 group">
-                    <i class="bi bi-gear-fill group-hover:rotate-90 transition-transform duration-500"></i>
-                    <span>CONFIGURAÇÕES</span>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button id="restart-hardware-btn" class="flex items-center gap-2 bg-red-600/10 hover:bg-red-600/20 text-red-500 px-4 py-2 rounded-lg transition-all border border-red-500/20 active:scale-95 group">
+                        <i class="bi bi-arrow-clockwise group-hover:rotate-180 transition-transform duration-500"></i>
+                        <span>REINICIAR</span>
+                    </button>
+                    <button id="open-setup" class="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-all border border-slate-600 active:scale-95 group">
+                        <i class="bi bi-gear-fill group-hover:rotate-90 transition-transform duration-500"></i>
+                        <span>CONFIGURAÇÕES</span>
+                    </button>
+                </div>
             </div>
         </div>
     </nav>
@@ -212,6 +218,32 @@
         const setupSubmit = document.getElementById('setup-submit');
         const openSetupBtn = document.getElementById('open-setup');
         const closeSetupBtn = document.getElementById('close-setup');
+        const restartHardwareBtn = document.getElementById('restart-hardware-btn');
+
+        // Reinicia o hardware e a coleta
+        restartHardwareBtn.addEventListener('click', async () => {
+            if (!confirm("Isso irá apagar todos os dados atuais e reiniciar a conexão serial. Continuar?")) return;
+            
+            restartHardwareBtn.disabled = true;
+            restartHardwareBtn.innerHTML = '<i class="bi bi-arrow-repeat animate-spin"></i> REINICIANDO...';
+            
+            try {
+                const response = await fetch('/api/restart', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    window.location.reload();
+                } else {
+                    alert("Erro ao reiniciar: " + result.error);
+                    restartHardwareBtn.disabled = false;
+                    restartHardwareBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> <span>REINICIAR</span>';
+                }
+            } catch (err) {
+                alert("Erro de comunicação com o servidor.");
+                restartHardwareBtn.disabled = false;
+                restartHardwareBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> <span>REINICIAR</span>';
+            }
+        });
 
         // Abre o modal manualmente
         openSetupBtn.addEventListener('click', () => {
@@ -221,6 +253,16 @@
         // Fecha o modal manualmente
         closeSetupBtn.addEventListener('click', () => {
             setupOverlay.classList.add('hidden');
+        });
+
+        // Atalho ESC para fechar o modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !setupOverlay.classList.contains('hidden')) {
+                // Apenas fecha se o botão de fechar estiver visível (ou seja, se não for obrigatório)
+                if (!closeSetupBtn.classList.contains('hidden')) {
+                    setupOverlay.classList.add('hidden');
+                }
+            }
         });
 
         // Verifica status da conexão ao carregar

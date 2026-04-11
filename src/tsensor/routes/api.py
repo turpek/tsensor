@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, jsonify, request
-from tsensor.extensions import data_stream, config, app_status
+from tsensor.extensions import data_stream, buffer_stream, config, app_status
 from tsensor.core.utils import save_config, MCU_PRESETS
-from tsensor.core.acquisition import start_acquisition
+from tsensor.core.acquisition import start_acquisition, stop_acquisition
 
 api_route = Blueprint("api", __name__, url_prefix="/api")
 
@@ -64,6 +64,19 @@ def update_config():
             start_acquisition()
 
         return jsonify({"success": True, "message": "Configurações salvas."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api_route.route("/restart", methods=["POST"])
+def restart_acquisition_route():
+    """Rota específica para reinicializar manualmente o hardware."""
+    try:
+        stop_acquisition()
+        data_stream.clear()
+        buffer_stream.clear()
+        start_acquisition()
+        return jsonify({"success": True, "message": "Hardware reiniciado."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

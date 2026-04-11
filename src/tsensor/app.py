@@ -23,8 +23,8 @@ app.register_blueprint(api_route)
 
 
 if __name__ == "__main__":
-    # Garante que a thread de aquisição inicie apenas uma vez no modo debug do Flask
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    # Inicia a aquisição se não estiver no modo debug OU se for o processo principal do modo debug
+    if not config["presentation"]["debug_mode"] or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         start_acquisition()
 
     app.run(
