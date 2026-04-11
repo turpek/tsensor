@@ -1,7 +1,8 @@
 from datetime import datetime
+
+import numpy as np
 import os
 import toml
-from datetime import datetime
 
 # Caminho absoluto para o arquivo de configuração
 CONFIG_PATH = os.path.join(os.getcwd(), "config.toml")
@@ -81,3 +82,20 @@ def save_config(config_dict: dict) -> None:
     """Salva as configurações de volta no arquivo TOML."""
     with open(CONFIG_PATH, "w") as f:
         toml.dump(config_dict, f)
+
+
+def detrend(samples: list[float]) -> list[float]:
+
+    if not samples:
+        return []
+    elif len(samples) == 1:
+        return [0.0]
+
+    y_temperature = np.array(samples)
+    x_time = np.arange(len(y_temperature))
+    coefficient = np.polyfit(x_time, y_temperature, 1)
+    line = np.poly1d(coefficient)
+    y_projected = line(x_time)
+
+    residuals = y_temperature - y_projected
+    return residuals.tolist()

@@ -16,6 +16,7 @@ dependencies = [
     "parsel",
     "pytest",
     "pytest-mock",
+    "numpy",
 ]
 
 [tool.setuptools.packages.find]
