@@ -31,6 +31,14 @@ DEFAULT_CONFIG = {
         "flask_port": 5000,
         "debug_mode": False,
     },
+    "exporter": {
+        "google_drive": {
+            "credentials_file": "credentials.json",
+            "token_file": "token.json",
+            "scopes": ["https://www.googleapis.com/auth/drive.file"],
+            "file_name": "tsensor_data",
+        }
+    },
 }
 
 # Única fonte de presets para microcontroladores

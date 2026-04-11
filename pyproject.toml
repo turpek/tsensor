@@ -6,7 +6,16 @@ build-backend = "setuptools.build_meta"
 name = "tsensor"
 version = "0.1.0"
 dependencies = [
+    "flask",
+    "pyserial",
+    "loguru",
+    "toml",
+    "google-api-python-client",
+    "google-auth-oauthlib",
+    "google-auth-httplib2",
+    "parsel",
     "pytest",
+    "pytest-mock",
 ]
 
 [tool.setuptools.packages.find]
