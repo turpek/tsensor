@@ -1,10 +1,49 @@
 from flask import Blueprint, render_template, jsonify, request
 from tsensor.extensions import data_stream, buffer_stream, config, app_status
-from tsensor.core.utils import save_config, MCU_PRESETS
+from tsensor.core.utils import save_config, MCU_PRESETS, detrend
+from tsensor.core.data_stream import DataStream
 from tsensor.core.acquisition import start_acquisition, stop_acquisition
 from tsensor.core.exporters import CSVExporter
 
 api_route = Blueprint("api", __name__, url_prefix="/api")
+
+
+@api_route.route("/residual-analysis", methods=["GET"])
+def get_residual_analysis():
+    """Realiza a análise residual das amostras atuais e retorna o histograma."""
+    samples = data_stream.sample
+    if not samples:
+        return jsonify({"error": "Não há dados para análise."}), 400
+
+    # Extrai apenas as temperaturas e aplica detrend
+    temps = [s[1] for s in samples]
+    residuals = detrend(temps)
+
+    # Cria um DataStream temporário para gerar o histograma dos resíduos
+    # Usamos o tamanho exato dos resíduos
+    residual_ds = DataStream(total_samples=len(residuals))
+    for r in residuals:
+        residual_ds.add(r, "")
+
+    # Resolução para o histograma de resíduos (mesma do sensor)
+    v_ref = config["sensor"]["v_ref"]
+    adc_max = config["sensor"]["adc_max"]
+    res_c = (v_ref / adc_max) * 100
+
+    # Aumentamos a precisão decimal para resíduos (geralmente são valores pequenos)
+    decimals = config["presentation"]["decimal_places"] + 1
+
+    hist_dict = residual_ds.histogram(res_c, decimal_label=decimals)
+
+    return jsonify({
+        "labels": list(hist_dict.keys()),
+        "values": list(hist_dict.values()),
+        "stats": {
+            "mean": residual_ds.mean,
+            "std": residual_ds.std,
+            "n": len(residual_ds)
+        }
+    })
 
 
 @api_route.route("/export", methods=["POST"])
@@ -41,7 +80,6 @@ def export_data():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 
 @api_route.route("/status", methods=["GET"])
@@ -118,11 +156,12 @@ def restart_acquisition_route():
     """Rota específica para reinicializar manualmente o hardware."""
     try:
         stop_acquisition()
-        
+
         # Limpa os streams e atualiza o tamanho dos buffers com a config atual
         data_stream.clear(total_samples=config["acquisition"]["total_samples"])
-        buffer_stream.clear(total_samples=config["acquisition"]["buffer_samples"])
-        
+        buffer_stream.clear(
+            total_samples=config["acquisition"]["buffer_samples"])
+
         start_acquisition()
         return jsonify({"success": True, "message": "Hardware reiniciado."})
     except Exception as e:

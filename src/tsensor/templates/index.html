@@ -137,6 +137,42 @@
         </div>
     </div>
 
+    <!-- Modal de Análise Residual -->
+    <div id="residual-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-[2.5rem] shadow-2xl max-w-5xl w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div class="p-8 flex justify-between items-center border-b border-slate-100 bg-slate-50">
+                <div>
+                    <h2 class="text-2xl font-black text-slate-800 leading-tight">Análise Residual</h2>
+                    <p class="text-slate-500 text-sm font-medium italic">Dados sem tendência linear (Detrended)</p>
+                </div>
+                <button id="close-residual" class="text-slate-400 hover:text-slate-900 transition-colors p-2 hover:bg-slate-100 rounded-full">
+                    <i class="bi bi-x-lg text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-10">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-center">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Média Residual</h4>
+                        <p id="residual-mean" class="text-xl font-bold text-indigo-600">-</p>
+                    </div>
+                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-center">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ruído (σ Residual)</h4>
+                        <p id="residual-std" class="text-xl font-bold text-blue-600">-</p>
+                    </div>
+                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-center">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Amostras Analisadas</h4>
+                        <p id="residual-n" class="text-xl font-bold text-slate-700">-</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-3xl border border-slate-100 relative h-[450px]">
+                    <canvas id="residualChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Navegação -->
     <nav class="bg-slate-800 text-white shadow-lg mb-8">
         <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -145,6 +181,10 @@
                 <h1 class="text-xl font-bold tracking-tight">TSENSOR <span class="text-blue-400 text-sm font-normal uppercase tracking-widest ml-1">Core</span></h1>
             </div>
             <div class="flex items-center gap-3">
+                <button id="residual-btn" class="flex items-center gap-2 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 px-4 py-2 rounded-xl transition-all border border-indigo-500/20 active:scale-95 group">
+                    <i class="bi bi-activity group-hover:scale-110 transition-transform"></i>
+                    <span class="text-xs font-bold uppercase tracking-wider">Residual</span>
+                </button>
                 <button id="export-btn" class="flex items-center gap-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 px-4 py-2 rounded-xl transition-all border border-blue-500/20 active:scale-95 group">
                     <i class="bi bi-cloud-arrow-up group-hover:-translate-y-0.5 transition-transform"></i>
                     <span class="text-xs font-bold uppercase tracking-wider">Exportar</span>
@@ -194,7 +234,62 @@
 
     <script>
         let chartInstance = null;
+        let residualChartInstance = null;
         let pollingIntervalId = null;
+
+        async function openResidualAnalysis() {
+            const overlay = document.getElementById('residual-overlay');
+            overlay.classList.remove('hidden');
+            
+            try {
+                const res = await fetch('/api/residual-analysis');
+                const data = await res.json();
+                
+                if (data.error) {
+                    alert(data.error);
+                    overlay.classList.add('hidden');
+                    return;
+                }
+
+                // Atualiza Cards
+                document.getElementById('residual-mean').innerText = data.stats.mean.toFixed(6);
+                document.getElementById('residual-std').innerText = data.stats.std.toFixed(6);
+                document.getElementById('residual-n').innerText = data.stats.n;
+
+                // Renderiza Gráfico
+                const ctx = document.getElementById('residualChart').getContext('2d');
+                if (residualChartInstance) {
+                    residualChartInstance.data.labels = data.labels;
+                    residualChartInstance.data.datasets[0].data = data.values;
+                    residualChartInstance.update();
+                } else {
+                    residualChartInstance = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label: 'Frequência de Ruído',
+                                data: data.values,
+                                backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                                borderRadius: 12
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                                x: { grid: { display: false } }
+                            }
+                        }
+                    });
+                }
+            } catch (e) {
+                alert("Erro ao realizar análise.");
+                overlay.classList.add('hidden');
+            }
+        }
 
         async function checkStatus() {
             try {
@@ -274,11 +369,20 @@
             document.getElementById('open-setup').addEventListener('click', () => document.getElementById('setup-overlay').classList.remove('hidden'));
             document.getElementById('close-setup').addEventListener('click', () => document.getElementById('setup-overlay').classList.add('hidden'));
             
+            document.getElementById('residual-btn').addEventListener('click', openResidualAnalysis);
+            document.getElementById('close-residual').addEventListener('click', () => document.getElementById('residual-overlay').classList.add('hidden'));
+
             document.addEventListener('keydown', (e) => {
-                const overlay = document.getElementById('setup-overlay');
-                const closeBtn = document.getElementById('close-setup');
-                if (e.key === 'Escape' && !overlay.classList.contains('hidden')) {
-                    if (!closeBtn.classList.contains('hidden')) overlay.classList.add('hidden');
+                const setupOverlay = document.getElementById('setup-overlay');
+                const residualOverlay = document.getElementById('residual-overlay');
+                if (e.key === 'Escape') {
+                    if (!setupOverlay.classList.contains('hidden')) {
+                        const closeBtn = document.getElementById('close-setup');
+                        if (!closeBtn.classList.contains('hidden')) setupOverlay.classList.add('hidden');
+                    }
+                    if (!residualOverlay.classList.contains('hidden')) {
+                        residualOverlay.classList.add('hidden');
+                    }
                 }
             });
         });
