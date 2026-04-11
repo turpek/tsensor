@@ -34,4 +34,33 @@
 3. **Performance:** O processamento deve suportar volumes de dados (ex: 1.000.000 amostras) sem degradação do frame rate do dashboard.
 4. **Acoplamento:** Mantenha a lógica de negócio (DataStream) isolada da lógica de transporte (Serial/Flask).
 5. **Codificação**: Você ficara responsavel pelo front e testes, não é para mexer com backend.
-6. **Teste**: usar o pytest, para o mock usar o pytest-mock.
+6. Teste: usar o pytest, para o mock usar o pytest-mock.
+
+## Histórico de Implementações (Sessão 11/04/2026)
+
+### 1. Orquestração e Protocolo
+- Implementação do `StreamManager` para gerenciar múltiplos handlers e contagem global de amostras válidas.
+- Atualização do `serial_reading` para suportar o protocolo baseado em prefixo `T=` via Regex.
+- Implementação de lógica de interrupção segura (`stop()`) na thread de aquisição.
+
+### 2. Robustez do Processamento (DataStream)
+- Melhoria do método `histogram`: introdução de `iqr_seguro` baseado na resolução ADC para evitar colapso de bins em dados estáveis.
+- Ajuste no Filtro de Tukey para evitar descarte indevido de pequenas variações térmicas.
+- Atualização do método `clear()` para suportar redimensionamento dinâmico do buffer (`total_samples`).
+
+### 3. Infraestrutura de Exportação
+- Criação do protocolo `DataExporter` para abstração de serviços de saída.
+- Implementação do `CSVExporter` para salvamento local de sessões na pasta `exports/`.
+- Estruturação da classe `GoogleDriveExporter` (OAuth 2.0 / Drive API) preparada para integração futura.
+
+### 4. Interface e Experiência do Usuário (UI/UX)
+- Redesign do Modal de Configuração: Layout de duas colunas (Sidebar informativa + Formulário).
+- Implementação de Feedback em Tempo Real: Presets de MCU (ESP32/Arduino) que auto-preenchem V_Ref e Resolução ADC.
+- Adição de botões de controle: **Exportar** (CSV) e **Reiniciar** (Reset de Hardware).
+- Melhoria de Acessibilidade: Atalho `ESC` para fechar modais e fontes otimizadas para leitura (text-base).
+
+### 5. Qualidade e Testes (TDD)
+- Centralização de testes de API em `tests/test_api.py`.
+- Cobertura completa de novos componentes: `test_exporters.py`, `test_handler.py` e validação de dados estáveis no histograma.
+- Configuração de supressão de warnings da Google API no `pyproject.toml`.
+
