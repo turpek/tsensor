@@ -1,3 +1,4 @@
+from tsensor.core.exporters import CSVExporter
 import pytest
 import io
 from tsensor.core.exporters import GoogleDriveExporter
@@ -98,3 +99,50 @@ def test_google_drive_export_failure_logs_error(exporter, mocker):
     # Pega a última chamada do logger para ver se contém a mensagem de erro
     last_call_args = mock_logger.info.call_args_list[-1][0][0]
     assert "Upload falhou" in last_call_args
+
+
+@pytest.fixture
+def csv_exporter(tmp_path):
+    """Cria um CSVExporter em um diretório temporário para testes."""
+    return CSVExporter(
+        directory=str(tmp_path / "exports"),
+        header=["timestamp", "temperatura"]
+    )
+
+
+def test_csv_exporter_setup_creates_directory(csv_exporter):
+    """Verifica se o setup cria o diretório de exportação."""
+    path = csv_exporter.setup()
+    assert path.exists()
+    assert path.is_dir()
+
+
+def test_csv_exporter_export_saves_file(csv_exporter):
+    """Verifica se o export salva os dados corretamente no disco."""
+    csv_exporter.setup()
+    data = [("10:00:01", 25.5), ("10:00:02", 26.0)]
+
+    result = csv_exporter.export(data, "test_file")
+
+    assert result is True
+
+    file_path = csv_exporter._directory / "test_file.csv"
+    assert file_path.exists()
+
+    # Valida o conteúdo do arquivo
+    with open(file_path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+        assert lines[0].strip() == "timestamp,temperatura"
+        assert lines[1].strip() == "10:00:01,25.5"
+        assert lines[2].strip() == "10:00:02,26.0"
+
+
+def test_csv_exporter_failure_returns_false(csv_exporter, mocker):
+    """Verifica se falhas na escrita retornam False."""
+    csv_exporter.setup()
+    # Mock do open para lançar erro (simulando permissão negada, p.ex)
+    mocker.patch("builtins.open",
+                 side_effect=PermissionError("Permission Denied"))
+
+    result = csv_exporter.export([("10:00:01", 25.5)], "fail_file")
+    assert result is False

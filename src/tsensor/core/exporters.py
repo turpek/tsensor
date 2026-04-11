@@ -106,3 +106,42 @@ class GoogleDriveExporter:
             return False
 
         return True
+
+
+class CSVExporter:
+    def __init__(self, directory: str, header: list):
+        """
+        Exportador de dados para formato CSV local.
+
+        Args:
+            directory: Pasta onde os arquivos serão salvos.
+            header: Cabeçalho das colunas.
+        """
+        self._directory = Path(directory)
+        self._header = header
+
+    def setup(self) -> Path:
+        """Garante que o diretório de exportação existe."""
+        if not self._directory.exists():
+            self._directory.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Diretório de exportação criado: {self._directory}")
+        return self._directory
+
+    def export(self, data: list[tuple[str, float]], destination_name: str) -> bool:
+        """
+        Salva a lista de amostras em um arquivo CSV local.
+        O nome do arquivo incluirá um timestamp para evitar colisões.
+        """
+        file_path = self._directory / f"{destination_name}.csv"
+
+        try:
+            with open(str(file_path), 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(self._header)
+                writer.writerows(data)
+
+            logger.info(f"Dados exportados com sucesso para: {file_path}")
+            return True
+        except Exception as err:
+            logger.error(f"Falha ao exportar CSV local: {err}")
+            return False
