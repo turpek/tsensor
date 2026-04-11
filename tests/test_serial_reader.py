@@ -1,5 +1,5 @@
 from tsensor.core.serial_reader import serial_reading
-import pytest
+
 
 def test_serial_reading_calls_dispatch_until_inactive(mocker):
     """Verifica se o loop de leitura chama o dispatch enquanto o manager estiver ativo."""
@@ -17,11 +17,13 @@ def test_serial_reading_calls_dispatch_until_inactive(mocker):
     # 2. Mock do StreamManager
     mock_manager = mocker.Mock()
     # O loop roda enquanto is_active for True.
-    type(mock_manager).is_active = mocker.PropertyMock(side_effect=[True, True, False])
-    
+    type(mock_manager).is_active = mocker.PropertyMock(
+        side_effect=[True, True, False],
+    )
+
     # Mock para evitar erro no log final: {len(stream_manager.count_samples)}
     # Mesmo sendo um erro no backend, o mock precisa sustentar a chamada para o teste passar
-    mock_manager.count_samples = [1, 2] 
+    mock_manager.count_samples = [1, 2]
 
     # 3. Execução
     serial_reading(
@@ -42,6 +44,7 @@ def test_serial_reading_calls_dispatch_until_inactive(mocker):
     mock_serial_cls.assert_called_once_with("/dev/ttyUSB0", 115200, timeout=1)
     mock_ser_instance.close.assert_called_once()
 
+
 def test_serial_reading_handles_decoding_errors(mocker):
     """Verifica se a função lida com caracteres inválidos na serial usando ignore."""
     mock_serial_cls = mocker.patch("tsensor.core.serial_reader.Serial")
@@ -49,7 +52,9 @@ def test_serial_reading_handles_decoding_errors(mocker):
     mock_ser_instance.readline.return_value = b"T=10\xff24\n"
 
     mock_manager = mocker.Mock()
-    type(mock_manager).is_active = mocker.PropertyMock(side_effect=[True, False])
+    type(mock_manager).is_active = mocker.PropertyMock(
+        side_effect=[True, False],
+    )
     mock_manager.count_samples = [1]
 
     serial_reading("COM1", 9600, 1, mock_manager)

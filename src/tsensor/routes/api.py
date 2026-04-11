@@ -32,12 +32,16 @@ def update_config():
     if new_mcu != old_mcu and new_mcu in MCU_PRESETS:
         preset = MCU_PRESETS[new_mcu]
         config["sensor"]["v_ref"] = float(data.get("v_ref", preset["v_ref"]))
-        config["sensor"]["adc_max"] = int(data.get("adc_max", preset["adc_max"]))
+        config["sensor"]["adc_max"] = int(
+            data.get("adc_max", preset["adc_max"]),
+        )
     else:
         # Mantém lógica atual para quando o MCU não muda
-        config["sensor"]["v_ref"] = float(data.get("v_ref", config["sensor"]["v_ref"]))
+        config["sensor"]["v_ref"] = float(
+            data.get("v_ref", config["sensor"]["v_ref"]),
+        )
         config["sensor"]["adc_max"] = int(
-            data.get("adc_max", config["sensor"]["adc_max"])
+            data.get("adc_max", config["sensor"]["adc_max"]),
         )
 
     # Atualiza configurações de aquisição e apresentação
@@ -45,7 +49,10 @@ def update_config():
         data.get("total_samples", config["acquisition"]["total_samples"])
     )
     config["presentation"]["update_interval_ms"] = int(
-        data.get("update_interval_ms", config["presentation"]["update_interval_ms"])
+        data.get(
+            "update_interval_ms",
+            config["presentation"]["update_interval_ms"],
+        )
     )
     config["presentation"]["decimal_places"] = int(
         data.get("decimal_places", config["presentation"]["decimal_places"])

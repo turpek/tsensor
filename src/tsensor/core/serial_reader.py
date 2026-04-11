@@ -25,4 +25,6 @@ def serial_reading(
         stream_manager.dispatch(line)
 
     ser.close()
-    logger.info(f"Coleta finalizada: {len(stream_manager.count_samples)} amostras")
+    logger.info(
+        f"Coleta finalizada: {len(stream_manager.count_samples)} amostras",
+    )

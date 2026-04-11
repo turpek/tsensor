@@ -4,6 +4,7 @@ from tsensor.core.data_stream import DataStream
 from tsensor.extensions import data_stream, buffer_stream
 from tsensor.core.utils import MCU_PRESETS
 
+
 def test_api_status_returns_connection_state(client, mocker):
     """Verifica se a rota /api/status retorna o estado global da aplicação."""
     mock_status = {
@@ -115,7 +116,7 @@ def test_api_config_updates_values_and_calls_save(client, mocker):
 def test_api_config_saves_and_applies_presets(mocker, client):
     """Valida se a rota /api/config aplica presets de hardware ao trocar MCU."""
     mock_save = mocker.patch("tsensor.routes.api.save_config")
-    
+
     # Mock do config atual para garantir transição
     mock_config = {
         "hardware": {"port": "/dev/ttyUSB0", "mcu": "arduino_uno", "baudrate": 9600},
@@ -154,6 +155,6 @@ def test_api_restart_clears_data_and_restarts_acquisition(client, mocker):
 
     assert response.status_code == 200
     assert response.json["success"] is True
-    
+
     assert len(data_stream) == 0
     assert len(buffer_stream) == 0

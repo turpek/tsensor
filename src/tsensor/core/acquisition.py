@@ -18,11 +18,11 @@ def stop_acquisition():
     with _thread_lock:
         if _current_manager:
             _current_manager.stop()
-        
+
         if _acquisition_thread and _acquisition_thread.is_alive():
             _acquisition_thread.join(timeout=2)
             logger.info("Thread de aquisição interrompida.")
-        
+
         _acquisition_thread = None
         _current_manager = None
 
@@ -71,6 +71,8 @@ def start_acquisition():
             v_ref=config["sensor"]["v_ref"],
         )
 
-        _acquisition_thread = threading.Thread(target=run, args=(_current_manager,), daemon=True)
+        _acquisition_thread = threading.Thread(
+            target=run, args=(_current_manager,), daemon=True,
+        )
         _acquisition_thread.start()
         logger.info("Thread de aquisição disparada com sucesso.")
