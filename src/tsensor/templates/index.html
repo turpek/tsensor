@@ -33,7 +33,12 @@
             </div>
 
             <!-- Lateral Direita: Formulário em Grid -->
-            <div class="p-8 md:w-2/3 bg-white overflow-y-auto max-h-[85vh]">
+            <div class="p-8 md:w-2/3 bg-white overflow-y-auto max-h-[85vh] relative">
+                <!-- Botão Fechar -->
+                <button id="close-setup" class="absolute right-6 top-6 text-slate-400 hover:text-slate-900 transition-colors p-2 hover:bg-slate-100 rounded-full hidden">
+                    <i class="bi bi-x-lg text-xl"></i>
+                </button>
+
                 <form id="setup-form" class="space-y-8">
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
@@ -145,8 +150,12 @@
                 <i class="bi bi-cpu text-blue-400 text-2xl"></i>
                 <h1 class="text-xl font-bold tracking-tight">TSENSOR <span class="text-blue-400 text-sm font-normal">v1.0</span></h1>
             </div>
-            <div class="flex items-center gap-4 text-sm font-medium">
-                <span class="flex items-center gap-1"><i class="bi bi-circle-fill text-green-500 text-[10px] animate-pulse"></i> LIVE</span>
+            <div class="flex items-center gap-6 text-sm font-medium">
+                <span class="flex items-center gap-1.5"><i class="bi bi-circle-fill text-green-500 text-[10px] animate-pulse"></i> LIVE</span>
+                <button id="open-setup" class="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-all border border-slate-600 active:scale-95 group">
+                    <i class="bi bi-gear-fill group-hover:rotate-90 transition-transform duration-500"></i>
+                    <span>CONFIGURAÇÕES</span>
+                </button>
             </div>
         </div>
     </nav>
@@ -194,12 +203,25 @@
 
     <script>
         let chartInstance = null;
+        let pollingIntervalId = null;
 
         // Elementos do DOM
         const setupOverlay = document.getElementById('setup-overlay');
         const setupForm = document.getElementById('setup-form');
         const setupError = document.getElementById('setup-error');
         const setupSubmit = document.getElementById('setup-submit');
+        const openSetupBtn = document.getElementById('open-setup');
+        const closeSetupBtn = document.getElementById('close-setup');
+
+        // Abre o modal manualmente
+        openSetupBtn.addEventListener('click', () => {
+            setupOverlay.classList.remove('hidden');
+        });
+
+        // Fecha o modal manualmente
+        closeSetupBtn.addEventListener('click', () => {
+            setupOverlay.classList.add('hidden');
+        });
 
         // Verifica status da conexão ao carregar
         async function checkStatus() {
@@ -209,12 +231,14 @@
                 
                 if (!status.connected) {
                     setupOverlay.classList.remove('hidden');
+                    closeSetupBtn.classList.add('hidden'); // Força a configuração se desconectado
                     if (status.error) {
                         setupError.innerText = `Erro: ${status.error}`;
                         setupError.classList.remove('hidden');
                     }
                 } else {
                     setupOverlay.classList.add('hidden');
+                    closeSetupBtn.classList.remove('hidden'); // Permite fechar se conectado
                     startPolling();
                 }
             } catch (err) {
@@ -222,11 +246,11 @@
             }
         }
 
-        // Envia novas configurações
+        // Envia novas configurações (Persiste sem resetar aquisição)
         setupForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             setupSubmit.disabled = true;
-            setupSubmit.innerHTML = '<i class="bi bi-arrow-repeat animate-spin"></i> CONECTANDO...';
+            setupSubmit.innerHTML = '<i class="bi bi-arrow-repeat animate-spin"></i> SALVANDO...';
 
             const formData = new FormData(setupForm);
             const data = Object.fromEntries(formData.entries());
@@ -241,19 +265,18 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Recarrega a página para aplicar as mudanças de hardware
-                    window.location.reload();
+                    // Tenta verificar se a conexão foi estabelecida após o salvamento
+                    setTimeout(checkStatus, 500);
                 } else {
-                    setupError.innerText = result.error || "Erro desconhecido ao salvar.";
+                    setupError.innerText = result.error || "Erro ao salvar.";
                     setupError.classList.remove('hidden');
-                    setupSubmit.disabled = false;
-                    setupSubmit.innerHTML = '<span>CONECTAR SENSOR</span><i class="bi bi-arrow-right"></i>';
                 }
             } catch (err) {
-                setupError.innerText = "Erro de rede ao conectar.";
+                setupError.innerText = "Erro de rede ao salvar.";
                 setupError.classList.remove('hidden');
+            } finally {
                 setupSubmit.disabled = false;
-                setupSubmit.innerHTML = '<span>CONECTAR SENSOR</span><i class="bi bi-arrow-right"></i>';
+                setupSubmit.innerHTML = '<span>SALVAR AJUSTES</span><i class="bi bi-arrow-right-circle"></i>';
             }
         });
 
@@ -300,12 +323,15 @@
             }
         });
 
-        // Polling dinâmico vindo do config.toml
-        function startPolling() {
-            setInterval(() => {
+        // Polling dinâmico
+        function startPolling(interval) {
+            if (pollingIntervalId) clearInterval(pollingIntervalId);
+            
+            const ms = interval || {{ config.presentation.update_interval_ms }};
+            pollingIntervalId = setInterval(() => {
                 $cruLoadContainer(document.getElementById('stats-container'));
                 $cruLoadContainer(document.getElementById('histogram-trigger'));
-            }, {{ config.presentation.update_interval_ms }});
+            }, ms);
         }
 
         // Lógica de atualização automática dos campos técnicos baseada no MCU

@@ -44,16 +44,17 @@ def update_config():
     try:
         save_config(config)
 
-        # Atualiza status global para refletir tentativa de troca
+        # Atualiza status visual
         app_status["port"] = config["hardware"]["port"]
         app_status["mcu"] = config["hardware"]["mcu"]
-        app_status["error"] = None
 
-        # Dispara a aquisição na nova porta/configuração
-        start_acquisition()
+        # SÓ inicia a aquisição se NÃO estiver conectado
+        # Se já estiver conectado, apenas salvamos para o próximo boot/restart manual
+        if not app_status.get("connected"):
+            start_acquisition()
 
         return jsonify(
-            {"success": True, "message": "Configuração salva. Reiniciando aquisição..."}
+            {"success": True, "message": "Configurações salvas."}
         )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
