@@ -50,6 +50,7 @@ def test_stat_initialization_with_data_overflow():
     # DP global de [10, 20, 30, 40, 50] -> sqrt(1000/4) = 15.811...
     assert np.isclose(s.std, np.std(data, ddof=1))
 
+
 def test_stat_add_incremental():
     """Verifica estatísticas simples adicionando dados sem atingir o limite."""
     s = Stat(total_samples=10)

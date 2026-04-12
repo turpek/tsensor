@@ -236,7 +236,8 @@ def test_api_residual_analysis_success(client, mocker):
                  ("10:00:04", 13.0), ("10:00:05", 14.0)]
 
     mock_stream = mocker.patch("tsensor.routes.api.data_stream")
-    type(mock_stream).sample = mocker.PropertyMock(return_value=test_data)
+    type(mock_stream).data = mocker.PropertyMock(
+        return_value=[d[1] for d in test_data])
 
     response = client.get("/api/residual-analysis")
 
@@ -255,7 +256,7 @@ def test_api_residual_analysis_success(client, mocker):
 def test_api_residual_analysis_no_data(client, mocker):
     """Verifica se /api/residual-analysis retorna erro quando não há dados."""
     mock_stream = mocker.patch("tsensor.routes.api.data_stream")
-    type(mock_stream).sample = mocker.PropertyMock(return_value=[])
+    type(mock_stream).data = mocker.PropertyMock(return_value=[])
 
     response = client.get("/api/residual-analysis")
 

@@ -1,7 +1,7 @@
+import numpy as np
 from flask import Blueprint, render_template, jsonify, request
 from tsensor.extensions import data_stream, buffer_stream, config, app_status
-from tsensor.core.utils import save_config, MCU_PRESETS, detrend
-from tsensor.core.data_stream import DataStream
+from tsensor.core.utils import save_config, MCU_PRESETS, detrend, Stat, histogram
 from tsensor.core.acquisition import start_acquisition, stop_acquisition
 from tsensor.core.exporters import CSVExporter
 
@@ -11,19 +11,16 @@ api_route = Blueprint("api", __name__, url_prefix="/api")
 @api_route.route("/residual-analysis", methods=["GET"])
 def get_residual_analysis():
     """Realiza a análise residual das amostras atuais e retorna o histograma."""
-    samples = data_stream.sample
-    if not samples:
+    temps = data_stream.data
+    if not temps:
         return jsonify({"error": "Não há dados para análise."}), 400
 
     # Extrai apenas as temperaturas e aplica detrend
-    temps = [s[1] for s in samples]
     residuals = detrend(temps)
+    res_array = np.array(residuals)
 
-    # Cria um DataStream temporário para gerar o histograma dos resíduos
-    # Usamos o tamanho exato dos resíduos
-    residual_ds = DataStream(total_samples=len(residuals))
-    for r in residuals:
-        residual_ds.add(r, "")
+    # Usa a classe Stat com inicialização atômica (muito mais rápido que loop)
+    stat = Stat(total_samples=len(res_array), initial_data=res_array)
 
     # Resolução para o histograma de resíduos (mesma do sensor)
     v_ref = config["sensor"]["v_ref"]
@@ -33,15 +30,22 @@ def get_residual_analysis():
     # Aumentamos a precisão decimal para resíduos (geralmente são valores pequenos)
     decimals = config["presentation"]["decimal_places"] + 1
 
-    hist_dict = residual_ds.histogram(res_c, decimal_label=decimals)
+    # O histograma agora é chamado globalmente pois a classe Stat não o possui
+    hist_dict = histogram(
+        res_array,
+        stat.amplitude,
+        stat.moving_average,
+        resolucao_adc=res_c,
+        decimal_label=decimals,
+    )
 
     return jsonify({
         "labels": list(hist_dict.keys()),
         "values": list(hist_dict.values()),
         "stats": {
-            "mean": residual_ds.mean,
-            "std": residual_ds.std,
-            "n": len(residual_ds)
+            "mean": stat.mean,
+            "std": stat.std,
+            "n": len(stat)
         }
     })
 
