@@ -159,18 +159,37 @@ def histogram(
 
 
 class Stat:
-    def __init__(self, total_samples: int):
+    def __init__(self, total_samples: int, initial_data: Optional[np.ndarray] = None):
         self._total_count = 0
         self._tc_samples = 0
         self._total_samples = total_samples
+        self._mean = 0.0
         self._moving_sum = 0.0
         self._moving_average = 0.0
-        self._mean = 0.0
         self._max = -float("inf")
         self._min = float("inf")
         self.__m2 = 0.0
         self.__old_shift = 0.0
         self.__new_shift = 0.0
+
+        if isinstance(initial_data, np.ndarray):
+            self.__atomic_update(initial_data)
+
+    def __len__(self) -> int:
+        return self._tc_samples
+
+    def __atomic_update(self, data: np.ndarray) -> None:
+        self._total_count = len(data)
+        self._mean = np.mean(data)
+        self._max = np.max(data)
+        self._min = np.min(data)
+        self.__m2 = np.var(data) * len(data)
+
+        idx = len(data) - self._total_samples
+        dt = data if idx < 0 else data[idx:]
+        self._tc_samples = len(dt)
+        self._moving_sum = np.sum(dt)
+        self._moving_average = self._moving_sum / self._tc_samples
 
     def _update_shift_and_mean(self, data: float) -> None:
         self.__old_shift = data - self._mean
@@ -243,4 +262,4 @@ class Stat:
 
     @property
     def is_full(self) -> bool:
-        return self._total_samples == self._tc_samples
+        return self._total_samples == len(self)

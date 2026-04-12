@@ -17,6 +17,39 @@ def test_stat_initialization():
     assert s.amplitude == 0.0
 
 
+def test_stat_initialization_with_data():
+    """Verifica a inicialização atômica da Stat com um ndarray de dados."""
+    data = np.array([10.0, 20.0, 30.0])
+    s = Stat(total_samples=10, initial_data=data)
+
+    assert s.mean == 20.0
+    assert s.moving_average == 20.0
+    assert s.min == 10.0
+    assert s.max == 30.0
+    assert np.isclose(s.std, 10.0)  # DP de [10, 20, 30] é 10
+    assert len(s) == 3
+    assert s.is_full is False
+
+
+def test_stat_initialization_with_data_overflow():
+    """Verifica se a inicialização com dados maiores que o limite descarta os mais antigos para a janela."""
+    # Janela de 3 amostras, dados de entrada: 5 amostras
+    data = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+    s = Stat(total_samples=3, initial_data=data)
+
+    # Média global de todos os 5 dados: (10+20+30+40+50)/5 = 30
+    assert s.mean == 30.0
+    # Média da janela (últimos 3): (30+40+50)/3 = 40
+    assert s.moving_average == 40.0
+    # Min/Max globais
+    assert s.min == 10.0
+    assert s.max == 50.0
+    # Tamanho da janela preenchida
+    assert len(s) == 3
+    assert s.is_full is True
+    # DP global de [10, 20, 30, 40, 50] -> sqrt(1000/4) = 15.811...
+    assert np.isclose(s.std, np.std(data, ddof=1))
+
 def test_stat_add_incremental():
     """Verifica estatísticas simples adicionando dados sem atingir o limite."""
     s = Stat(total_samples=10)
