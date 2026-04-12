@@ -19,7 +19,6 @@ class SerialHandler(Protocol):
         data: DataStream,
         temporal_data: DataStream,
         samples: int,
-        timeout: int,
         adc_max: int,
         v_ref: float,
     ):
@@ -43,7 +42,6 @@ class TemperatureHandler(ABC):
         data: DataStream,
         temporal_data: DataStream,
         samples: int,
-        timeout: int,
         adc_max: int,
         v_ref: float,
     ):
@@ -117,9 +115,9 @@ class StreamManager:
     def __init__(
         self,
         samples: int,
-        timeout: int,
         adc_max: int,
         v_ref: float,
+        timeout: Optional[int] = None,
         total_samples: Optional[int] = None,
     ):
         self._samples = samples
@@ -144,7 +142,6 @@ class StreamManager:
             data,
             temporal_data,
             self._samples,
-            self._timeout,
             self._adc_max,
             self._v_ref,
         )
@@ -166,13 +163,14 @@ class StreamManager:
 
     @property
     def is_active(self) -> bool:
-        if time() - self._start > self._timeout:
+        # Se houver timeout, verifica o tempo decorrido
+        if self._timeout is not None and (time() - self._start > self._timeout):
             return False
-        elif (
-            isinstance(self._total_samples,
-                       int) and self._count >= self._total_samples
-        ):
+        
+        # Se houver limite de amostras, verifica a contagem
+        if isinstance(self._total_samples, int) and self._count >= self._total_samples:
             return False
+            
         return self._active
 
 

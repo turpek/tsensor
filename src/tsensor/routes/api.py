@@ -155,6 +155,16 @@ def update_config():
         return jsonify({"error": str(e)}), 500
 
 
+@api_route.route("/stop", methods=["POST"])
+def stop_acquisition_route():
+    """Interrompe a aquisição de dados manualmente."""
+    try:
+        stop_acquisition()
+        return jsonify({"success": True, "message": "Aquisição interrompida."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @api_route.route("/restart", methods=["POST"])
 def restart_acquisition_route():
     """Rota específica para reinicializar manualmente o hardware."""

@@ -18,11 +18,9 @@ def ntc_handler(data_streams):
         data=data,
         temporal_data=temporal_data,
         samples=10,
-        timeout=1,
         adc_max=4095,
         v_ref=3.3,
     )
-
 
 @pytest.fixture
 def lm35_handler(data_streams):
@@ -31,7 +29,6 @@ def lm35_handler(data_streams):
         data=data,
         temporal_data=temporal_data,
         samples=10,
-        timeout=1,
         adc_max=1023,
         v_ref=1.1,
     )
