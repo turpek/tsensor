@@ -37,10 +37,24 @@
             </div>
 
             <!-- Lateral Direita: Formulário -->
-            <div class="p-10 md:w-2/3 bg-white overflow-y-auto max-h-[85vh] relative">
+            <div class="p-8 md:w-2/3 bg-white overflow-y-auto max-h-[85vh] relative">
                 <button id="close-setup" class="absolute right-6 top-6 text-slate-400 hover:text-slate-900 transition-colors p-2 hover:bg-slate-50 rounded-full hidden">
                     <i class="bi bi-x-lg text-xl"></i>
                 </button>
+
+                <!-- Tabs Navigation -->
+                <div class="flex gap-2 mb-8 bg-slate-50 p-1.5 rounded-2xl border border-slate-100 w-fit">
+                    <button type="button" onclick="switchTab('general')" id="tab-btn-general" class="tab-btn active px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all">
+                        <i class="bi bi-gear-wide-connected mr-2"></i>Geral
+                    </button>
+                    <button type="button" onclick="switchTab('debug')" id="tab-btn-debug" class="tab-btn px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-slate-400 hover:text-slate-600">
+                        <i class="bi bi-bug mr-2"></i>Debug
+                    </button>
+                </div>
+
+                <style>
+                    .tab-btn.active { @apply bg-white shadow-sm text-blue-600 border border-slate-200; }
+                </style>
 
                 <form id="setup-form" class="space-y-8">
                     <div id="setup-error" class="hidden bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl text-sm flex items-center gap-3 font-semibold">
@@ -48,45 +62,46 @@
                         <span id="setup-error-text"></span>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
+                    <!-- ABA GERAL -->
+                    <div id="tab-content-general" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
                         
                         <!-- Coluna 1: Hardware -->
                         <div class="space-y-6">
-                            <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                                 <i class="bi bi-cpu"></i> Hardware & Conexão
                             </h3>
                             
-                            <div class="space-y-5">
+                            <div class="space-y-4">
                                 <div>
-                                    <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">Porta Serial</label>
+                                    <label class="block text-[13px] font-bold text-slate-700 mb-1.5 ml-1">Porta Serial</label>
                                     <input type="text" name="port" value="{{ config.hardware.port }}"
-                                           class="w-full px-4 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none transition-all bg-slate-50 font-mono font-bold text-blue-600">
+                                           class="w-full px-4 py-2.5 text-sm border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none transition-all bg-slate-50 font-mono font-bold text-blue-600">
                                 </div>
 
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">MCU</label>
-                                        <select name="mcu" id="setup-mcu" class="w-full px-3 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none transition-all bg-slate-50 font-semibold cursor-pointer">
+                                        <label class="block text-[13px] font-bold text-slate-700 mb-1.5 ml-1">MCU</label>
+                                        <select name="mcu" id="setup-mcu" class="w-full px-3 py-2.5 text-sm border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none transition-all bg-slate-50 font-semibold cursor-pointer">
                                             <option value="esp32" {% if config.hardware.mcu == 'esp32' %}selected{% endif %}>ESP32</option>
                                             <option value="arduino_uno" {% if config.hardware.mcu == 'arduino_uno' %}selected{% endif %}>Uno</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">Baudrate</label>
-                                        <input type="number" name="baudrate" value="{{ config.hardware.baudrate }}" class="w-full px-3 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50">
+                                        <label class="block text-[13px] font-bold text-slate-700 mb-1.5 ml-1">Baudrate</label>
+                                        <input type="number" name="baudrate" value="{{ config.hardware.baudrate }}" class="w-full px-3 py-2.5 text-sm border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50">
                                     </div>
                                 </div>
 
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">V_Ref (V)</label>
+                                        <label class="block text-[13px] font-bold text-slate-700 mb-1.5 ml-1">V_Ref (V)</label>
                                         <input type="number" step="0.01" name="v_ref" id="setup-vref" value="{{ config.sensor.v_ref }}"
-                                               class="w-full px-4 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50 font-bold">
+                                               class="w-full px-4 py-2.5 text-sm border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50 font-bold">
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">ADC Max</label>
+                                        <label class="block text-[13px] font-bold text-slate-700 mb-1.5 ml-1">ADC Max</label>
                                         <input type="number" name="adc_max" id="setup-adcmax" value="{{ config.sensor.adc_max }}"
-                                               class="w-full px-4 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50 font-bold">
+                                               class="w-full px-4 py-2.5 text-sm border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50 font-bold">
                                     </div>
                                 </div>
                             </div>
@@ -95,101 +110,142 @@
                         <!-- Coluna 2: Amostragem & Interface -->
                         <div class="space-y-8">
                             <div class="space-y-6">
-                                <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                                     <i class="bi bi-database-down"></i> Amostragem & Limites
                                 </h3>
                                 
-                                <div class="space-y-5">
-                                    <div class="p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 transition-all focus-within:border-blue-200">
-                                        <div class="flex items-center justify-between mb-2">
-                                            <label class="text-sm font-bold text-slate-700">Limite de Amostras</label>
+                                <div class="space-y-4">
+                                    <div class="p-3 bg-slate-50 rounded-2xl border-2 border-slate-100 transition-all focus-within:border-blue-200">
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <label class="text-[13px] font-bold text-slate-700">Limite de Amostras</label>
                                             <input type="checkbox" name="enable_limit_samples" id="chk-limit-samples" 
-                                                   class="w-5 h-5 rounded-lg border-2 border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                   class="w-4 h-4 rounded-lg border-2 border-slate-300 text-blue-600 focus:ring-blue-500"
                                                    {% if config.acquisition.total_samples %}checked{% endif %}>
                                         </div>
                                         <input type="number" name="total_samples" id="input-total-samples" 
                                                value="{{ config.acquisition.total_samples or 1000000 }}"
-                                               class="w-full px-0 py-1 text-base bg-transparent outline-none font-extrabold text-blue-600 disabled:text-slate-400 disabled:cursor-not-allowed"
+                                               class="w-full px-0 py-0.5 text-sm bg-transparent outline-none font-extrabold text-blue-600 disabled:text-slate-400 disabled:cursor-not-allowed"
                                                {% if not config.acquisition.total_samples %}disabled{% endif %}>
                                     </div>
 
-                                    <div class="p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 transition-all focus-within:border-indigo-200">
-                                        <div class="flex items-center justify-between mb-2">
-                                            <label class="text-sm font-bold text-slate-700">Limite de Tempo (s)</label>
+                                    <div class="p-3 bg-slate-50 rounded-2xl border-2 border-slate-100 transition-all focus-within:border-indigo-200">
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <label class="text-[13px] font-bold text-slate-700">Limite de Tempo (s)</label>
                                             <input type="checkbox" name="enable_limit_time" id="chk-limit-time"
-                                                   class="w-5 h-5 rounded-lg border-2 border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                   class="w-4 h-4 rounded-lg border-2 border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                                    {% if config.acquisition.max_runtime_sec %}checked{% endif %}>
                                         </div>
                                         <input type="number" name="max_runtime_sec" id="input-max-runtime" 
                                                value="{{ config.acquisition.max_runtime_sec or 1800 }}"
-                                               class="w-full px-0 py-1 text-base bg-transparent outline-none font-extrabold text-indigo-600 disabled:text-slate-400 disabled:cursor-not-allowed"
+                                               class="w-full px-0 py-0.5 text-sm bg-transparent outline-none font-extrabold text-indigo-600 disabled:text-slate-400 disabled:cursor-not-allowed"
                                                {% if not config.acquisition.max_runtime_sec %}disabled{% endif %}>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="space-y-6 pt-2">
-                                <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                                     <i class="bi bi-palette"></i> Apresentação
                                 </h3>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">Update (ms)</label>
+                                        <label class="block text-[13px] font-bold text-slate-700 mb-1.5 ml-1">Update (ms)</label>
                                         <input type="number" name="update_interval_ms" value="{{ config.presentation.update_interval_ms }}"
-                                               class="w-full px-4 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50">
+                                               class="w-full px-4 py-2.5 text-sm border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50">
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">Decimais</label>
+                                        <label class="block text-[13px] font-bold text-slate-700 mb-1.5 ml-1">Decimais</label>
                                         <input type="number" name="decimal_places" value="{{ config.presentation.decimal_places }}" min="0" max="4"
-                                               class="w-full px-4 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50">
+                                               class="w-full px-4 py-2.5 text-sm border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50">
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="pt-8 border-t border-slate-100 flex items-center justify-end">
+                    <!-- ABA DEBUG -->
+                    <div id="tab-content-debug" class="tab-content hidden space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
+                        <div class="space-y-6">
+                            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <i class="bi bi-terminal-fill"></i> Modo Avançado & Diagnóstico
+                            </h3>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="p-5 bg-amber-50 rounded-2xl border-2 border-amber-100">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div>
+                                            <h4 class="text-sm font-bold text-amber-900">Modo Debug</h4>
+                                            <p class="text-[10px] text-amber-700 font-medium leading-tight">Ativa logs detalhados e alertas do sistema.</p>
+                                        </div>
+                                        <input type="checkbox" name="debug_mode" class="w-5 h-5 rounded-lg text-amber-600 focus:ring-amber-500"
+                                               {% if config.presentation.debug_mode %}checked{% endif %}>
+                                    </div>
+                                </div>
+
+                                <div class="p-5 bg-slate-50 rounded-2xl border-2 border-slate-100">
+                                    <label class="block text-[13px] font-bold text-slate-700 mb-2 ml-1">Nível de Log (Backend)</label>
+                                    <select name="log_level" class="w-full px-3 py-2 text-sm border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none bg-white font-semibold cursor-pointer">
+                                        <option value="INFO" {% if config.presentation.log_level == 'INFO' %}selected{% endif %}>INFO (Padrão)</option>
+                                        <option value="DEBUG" {% if config.presentation.log_level == 'DEBUG' %}selected{% endif %}>DEBUG (Verboso)</option>
+                                        <option value="WARNING" {% if config.presentation.log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
+                                        <option value="ERROR" {% if config.presentation.log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="p-5 bg-blue-50 rounded-2xl border-2 border-blue-100 flex items-start gap-4">
+                                <i class="bi bi-info-square-fill text-blue-500 text-lg"></i>
+                                <div>
+                                    <h4 class="text-sm font-bold text-blue-900 mb-1">Dica de Performance</h4>
+                                    <p class="text-[11px] text-blue-700 leading-snug">O modo DEBUG e intervalos de atualização abaixo de 500ms podem impactar o desempenho do navegador em sessões com milhões de amostras.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-6 border-t border-slate-100 flex items-center justify-end">
                         <button type="submit" id="setup-submit"
-                                class="w-full md:w-auto bg-slate-900 hover:bg-black text-white font-black py-4 px-12 rounded-2xl transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3 group">
-                            <span>SALVAR AJUSTES</span>
-                            <i class="bi bi-arrow-right-circle text-xl group-hover:translate-x-1 transition-transform"></i>
+                                class="w-full md:w-auto bg-slate-900 hover:bg-black text-white font-black py-3 px-10 rounded-2xl transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3 group">
+                            <span class="text-sm">SALVAR AJUSTES</span>
+                            <i class="bi bi-arrow-right-circle text-lg group-hover:translate-x-1 transition-transform"></i>
                         </button>
                     </div>
                 </form>
             </div>
         </div>
+        </div>
     </div>
 
     <!-- Modal de Análise Residual -->
     <div id="residual-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-        <div class="bg-white rounded-[2.5rem] shadow-2xl max-w-5xl w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in duration-300">
-            <div class="p-8 flex justify-between items-center border-b border-slate-100 bg-slate-50">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div class="p-5 flex justify-between items-center border-b border-slate-100 bg-slate-50">
                 <div>
-                    <h2 class="text-2xl font-black text-slate-800 leading-tight">Análise Residual</h2>
-                    <p class="text-slate-500 text-sm font-medium italic">Dados sem tendência linear (Detrended)</p>
+                    <h2 class="text-lg font-black text-slate-800 leading-tight">Análise Residual</h2>
+                    <p class="text-slate-500 text-[10px] font-medium italic">Dados sem tendência linear (Detrended)</p>
                 </div>
-                <button id="close-residual" class="text-slate-400 hover:text-slate-900 transition-colors p-2 hover:bg-slate-100 rounded-full">
-                    <i class="bi bi-x-lg text-xl"></i>
+                <button id="close-residual" class="text-slate-400 hover:text-slate-900 transition-colors p-1.5 hover:bg-slate-100 rounded-full">
+                    <i class="bi bi-x-lg text-lg"></i>
                 </button>
             </div>
             
-            <div class="p-10">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-center">
-                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Média Residual</h4>
-                        <p id="residual-mean" class="text-xl font-bold text-indigo-600">-</p>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
+                        <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Média Residual</h4>
+                        <p id="residual-mean" class="text-base font-bold text-indigo-600">-</p>
                     </div>
-                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-center">
-                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ruído (σ Residual)</h4>
-                        <p id="residual-std" class="text-xl font-bold text-blue-600">-</p>
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
+                        <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Ruído (σ Res.)</h4>
+                        <p id="residual-std" class="text-base font-bold text-blue-600">-</p>
                     </div>
-                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-center">
-                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Amostras Analisadas</h4>
-                        <p id="residual-n" class="text-xl font-bold text-slate-700">-</p>
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
+                        <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Amostras</h4>
+                        <p id="residual-n" class="text-base font-bold text-slate-700">-</p>
                     </div>
                 </div>
 
-                <div class="bg-white p-6 rounded-3xl border border-slate-100 relative h-[450px]">
+                <div class="bg-white p-4 rounded-2xl border border-slate-100 relative h-[320px]">
                     <canvas id="residualChart"></canvas>
                 </div>
             </div>
@@ -197,61 +253,61 @@
     </div>
 
     <!-- Navegação -->
-    <nav class="bg-slate-800 text-white shadow-lg mb-8">
-        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+    <nav class="bg-slate-800 text-white shadow-lg mb-6">
+        <div class="max-w-7xl mx-auto px-6 py-2.5 flex justify-between items-center">
             <div class="flex items-center gap-2">
-                <i class="bi bi-cpu text-blue-400 text-2xl"></i>
-                <h1 class="text-xl font-bold tracking-tight">TSENSOR <span class="text-blue-400 text-sm font-normal uppercase tracking-widest ml-1">Core</span></h1>
+                <i class="bi bi-cpu text-blue-400 text-xl"></i>
+                <h1 class="text-lg font-bold tracking-tight">TSENSOR <span class="text-blue-400 text-[10px] font-normal uppercase tracking-widest ml-1">Core</span></h1>
             </div>
-            <div class="flex items-center gap-3">
-                <button id="residual-btn" class="flex items-center gap-2 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 px-4 py-2 rounded-xl transition-all border border-indigo-500/20 active:scale-95 group">
+            <div class="flex items-center gap-2.5">
+                <button id="residual-btn" class="flex items-center gap-2 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 px-3 py-1.5 rounded-xl transition-all border border-indigo-500/20 active:scale-95 group">
                     <i class="bi bi-activity group-hover:scale-110 transition-transform"></i>
-                    <span class="text-xs font-bold uppercase tracking-wider">Residual</span>
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Residual</span>
                 </button>
-                <button id="export-btn" class="flex items-center gap-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 px-4 py-2 rounded-xl transition-all border border-blue-500/20 active:scale-95 group">
+                <button id="export-btn" class="flex items-center gap-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-xl transition-all border border-blue-500/20 active:scale-95 group">
                     <i class="bi bi-cloud-arrow-up group-hover:-translate-y-0.5 transition-transform"></i>
-                    <span class="text-xs font-bold uppercase tracking-wider">Exportar</span>
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Exportar</span>
                 </button>
-                <button id="stop-acquisition-btn" class="flex items-center gap-2 bg-amber-600/10 hover:bg-amber-600/20 text-amber-500 px-4 py-2 rounded-xl transition-all border border-amber-500/20 active:scale-95 group">
+                <button id="stop-acquisition-btn" class="flex items-center gap-2 bg-amber-600/10 hover:bg-amber-600/20 text-amber-500 px-3 py-1.5 rounded-xl transition-all border border-amber-500/20 active:scale-95 group">
                     <i class="bi bi-stop-circle group-hover:scale-110 transition-transform"></i>
-                    <span class="text-xs font-bold uppercase tracking-wider">Parar</span>
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Parar</span>
                 </button>
-                <button id="restart-hardware-btn" class="flex items-center gap-2 bg-red-600/10 hover:bg-red-600/20 text-red-500 px-4 py-2 rounded-xl transition-all border border-red-500/20 active:scale-95 group">
+                <button id="restart-hardware-btn" class="flex items-center gap-2 bg-red-600/10 hover:bg-red-600/20 text-red-500 px-3 py-1.5 rounded-xl transition-all border border-red-500/20 active:scale-95 group">
                     <i class="bi bi-arrow-clockwise group-hover:rotate-180 transition-transform duration-500"></i>
-                    <span class="text-xs font-bold uppercase tracking-wider">Reiniciar</span>
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Reiniciar</span>
                 </button>
-                <button id="open-setup" class="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl transition-all border border-slate-600 active:scale-95 group">
+                <button id="open-setup" class="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-xl transition-all border border-slate-600 active:scale-95 group">
                     <i class="bi bi-gear-fill group-hover:rotate-90 transition-transform duration-500"></i>
-                    <span class="text-xs font-bold uppercase tracking-wider">Configurar</span>
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Configurar</span>
                 </button>
             </div>
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto px-6 pb-12">
-        <header class="mb-8">
-            <h2 class="text-3xl font-black text-slate-800 tracking-tight">Dashboard de Monitoramento</h2>
-            <p class="text-slate-500 font-medium italic">Aquisição contínua de dados térmicos em tempo real</p>
+    <main class="max-w-7xl mx-auto px-6 pb-8">
+        <header class="mb-6">
+            <h2 class="text-2xl font-black text-slate-800 tracking-tight">Dashboard de Monitoramento</h2>
+            <p class="text-slate-500 text-xs font-medium italic">Aquisição contínua de dados térmicos em tempo real</p>
         </header>
 
-        <div id="stats-container" c-container="/api/stats" c-target="#stats-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-            <div class="animate-pulse bg-white p-6 rounded-2xl h-24 shadow-sm border border-slate-100"></div>
-            <div class="animate-pulse bg-white p-6 rounded-2xl h-24 shadow-sm border border-slate-100"></div>
-            <div class="animate-pulse bg-white p-6 rounded-2xl h-24 shadow-sm border border-slate-100"></div>
-            <div class="animate-pulse bg-white p-6 rounded-2xl h-24 shadow-sm border border-slate-100"></div>
-            <div class="animate-pulse bg-white p-6 rounded-2xl h-24 shadow-sm border border-slate-100"></div>
+        <div id="stats-container" c-container="/api/stats" c-target="#stats-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            <div class="animate-pulse bg-white p-4 rounded-xl h-20 shadow-sm border border-slate-100"></div>
+            <div class="animate-pulse bg-white p-4 rounded-xl h-20 shadow-sm border border-slate-100"></div>
+            <div class="animate-pulse bg-white p-4 rounded-xl h-20 shadow-sm border border-slate-100"></div>
+            <div class="animate-pulse bg-white p-4 rounded-xl h-20 shadow-sm border border-slate-100"></div>
+            <div class="animate-pulse bg-white p-4 rounded-xl h-20 shadow-sm border border-slate-100"></div>
         </div>
 
-        <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8">
-            <div class="flex justify-between items-center mb-8">
-                <h3 class="text-slate-800 font-black text-xl flex items-center gap-3">
+        <div class="max-w-5xl mx-auto bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-slate-800 font-black text-lg flex items-center gap-3">
                     <i class="bi bi-bar-chart-fill text-blue-500"></i> Distribuição das Leituras
                 </h3>
-                <div class="flex items-center gap-2 bg-green-50 text-green-600 px-4 py-2 rounded-full text-[10px] font-black border border-green-100 uppercase tracking-widest">
-                    <i class="bi bi-circle-fill animate-pulse text-[8px]"></i> LIVE
+                <div class="flex items-center gap-2 bg-green-50 text-green-600 px-3 py-1 rounded-full text-[9px] font-black border border-green-100 uppercase tracking-widest">
+                    <i class="bi bi-circle-fill animate-pulse text-[7px]"></i> LIVE
                 </div>
             </div>
-            <div class="relative h-[450px] w-full" id="histogram-trigger" c-container="/api/histogram" c-type="json" c-callback="renderHistogram">
+            <div class="relative h-[360px] w-full" id="histogram-trigger" c-container="/api/histogram" c-type="json" c-callback="renderHistogram">
                 <canvas id="histogramChart"></canvas>
             </div>
         </div>
@@ -263,6 +319,22 @@
         let chartInstance = null;
         let residualChartInstance = null;
         let pollingIntervalId = null;
+
+        function switchTab(tab) {
+            // Esconde todos os conteúdos
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            // Remove active de todos os botões
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('active', 'text-blue-600', 'bg-white', 'shadow-sm', 'border-slate-200');
+                b.classList.add('text-slate-400');
+            });
+
+            // Mostra o selecionado
+            document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-btn-${tab}`);
+            activeBtn.classList.add('active', 'text-blue-600', 'bg-white', 'shadow-sm', 'border-slate-200');
+            activeBtn.classList.remove('text-slate-400');
+        }
 
         async function openResidualAnalysis() {
             const overlay = document.getElementById('residual-overlay');

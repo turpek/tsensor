@@ -138,7 +138,7 @@ def update_config():
     else:
         config["acquisition"].pop("max_runtime_sec", None)
 
-    # Configurações de apresentação
+    # Configurações de apresentação e debug
     config["presentation"]["update_interval_ms"] = int(
         data.get(
             "update_interval_ms",
@@ -148,6 +148,10 @@ def update_config():
     config["presentation"]["decimal_places"] = int(
         data.get("decimal_places", config["presentation"]["decimal_places"])
     )
+    
+    # Debug e Logs
+    config["presentation"]["debug_mode"] = data.get("debug_mode") == "on" or data.get("debug_mode") is True
+    config["presentation"]["log_level"] = data.get("log_level", config["presentation"]["log_level"])
 
     try:
         save_config(config)

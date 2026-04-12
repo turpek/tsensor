@@ -94,8 +94,14 @@ def test_api_config_updates_values_and_calls_save(client, mocker):
         "hardware": {"port": "/old/port", "mcu": "arduino_uno", "baudrate": 9600},
         "sensor": {"adc_max": 1023, "v_ref": 1.1},
         "acquisition": {"total_samples": 1000},
-        "presentation": {"update_interval_ms": 500, "decimal_places": 2},
+        "presentation": {
+            "update_interval_ms": 500,
+            "decimal_places": 2,
+            "log_level": "INFO",
+            "debug_mode": False
+        },
     }
+
     mocker.patch("tsensor.routes.api.config", mock_config)
     mock_save = mocker.patch("tsensor.routes.api.save_config")
 
@@ -122,8 +128,14 @@ def test_api_config_saves_and_applies_presets(mocker, client):
         "hardware": {"port": "/dev/ttyUSB0", "mcu": "arduino_uno", "baudrate": 9600},
         "sensor": {"adc_max": 1023, "v_ref": 1.1},
         "acquisition": {"total_samples": 1000},
-        "presentation": {"update_interval_ms": 500, "decimal_places": 2},
+        "presentation": {
+            "update_interval_ms": 500,
+            "decimal_places": 2,
+            "log_level": "INFO",
+            "debug_mode": False
+        },
     }
+
     mocker.patch("tsensor.routes.api.config", mock_config)
 
     payload = {"port": "/dev/ttyUSB1", "mcu": "esp32", "baudrate": "115200"}
@@ -262,3 +274,32 @@ def test_api_residual_analysis_no_data(client, mocker):
 
     assert response.status_code == 400
     assert "error" in response.get_json()
+
+
+def test_api_update_config_advanced_and_debug(client, mocker):
+    """Valida o salvamento de configurações de debug e limites opcionais."""
+    mocker.patch("tsensor.routes.api.save_config")
+    
+    payload = {
+        "mcu": "esp32",
+        "port": "/dev/ttyUSB1",
+        "baudrate": "9600",
+        "enable_limit_samples": "on",
+        "total_samples": "5000",
+        "enable_limit_time": False, # Simula checkbox desmarcado
+        "update_interval_ms": "2000",
+        "decimal_places": "3",
+        "debug_mode": "on",
+        "log_level": "DEBUG"
+    }
+    
+    response = client.post("/api/config", json=payload)
+    assert response.status_code == 200
+    
+    from tsensor.extensions import config
+    # Verifica se os valores foram aplicados no dicionário global de config
+    assert config["acquisition"]["total_samples"] == 5000
+    assert "max_runtime_sec" not in config["acquisition"]
+    assert config["presentation"]["debug_mode"] is True
+    assert config["presentation"]["log_level"] == "DEBUG"
+    assert config["presentation"]["decimal_places"] == 3

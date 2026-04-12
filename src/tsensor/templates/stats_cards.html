@@ -1,25 +1,25 @@
 <!-- Stats Cards Partial -->
-<div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 text-center">
-    <h3 class="text-slate-500 text-xs font-bold uppercase mb-1 tracking-wider">Amostras (n)</h3>
-    <p id="stats-n" class="text-2xl font-bold text-slate-700">{{ stats.n }}</p>
+<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center">
+    <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Amostras (n)</h3>
+    <p id="stats-n" class="text-xl font-bold text-slate-700">{{ stats.n }}</p>
 </div>
 
-<div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 text-center">
-    <h3 class="text-slate-500 text-xs font-bold uppercase mb-1 tracking-wider">Média (x̄)</h3>
-    <p id="stats-mean" class="text-2xl font-bold text-blue-600">{{ "%.4f"|format(stats.mean) }}</p>
+<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center">
+    <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Média (x̄)</h3>
+    <p id="stats-mean" class="text-xl font-bold text-blue-600">{{ "%.4f"|format(stats.mean) }}</p>
 </div>
 
-<div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 text-center">
-    <h3 class="text-slate-500 text-xs font-bold uppercase mb-1 tracking-wider">Desvio Padrão (σ)</h3>
-    <p id="stats-std" class="text-2xl font-bold text-indigo-600">{{ "%.4f"|format(stats.std) }}</p>
+<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center">
+    <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Desvio Padrão (σ)</h3>
+    <p id="stats-std" class="text-xl font-bold text-indigo-600">{{ "%.4f"|format(stats.std) }}</p>
 </div>
 
-<div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 text-center">
-    <h3 class="text-slate-500 text-xs font-bold uppercase mb-1 tracking-wider">Mínimo</h3>
-    <p id="stats-min" class="text-2xl font-bold text-slate-700">{{ "%.2f"|format(stats.min) }}</p>
+<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center">
+    <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Mínimo</h3>
+    <p id="stats-min" class="text-xl font-bold text-slate-700">{{ "%.2f"|format(stats.min) }}</p>
 </div>
 
-<div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 text-center border-r-4 border-r-blue-400">
-    <h3 class="text-slate-500 text-xs font-bold uppercase mb-1 tracking-wider">Máximo</h3>
-    <p id="stats-max" class="text-2xl font-bold text-slate-700">{{ "%.2f"|format(stats.max) }}</p>
+<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center border-r-4 border-r-blue-400">
+    <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Máximo</h3>
+    <p id="stats-max" class="text-xl font-bold text-slate-700">{{ "%.2f"|format(stats.max) }}</p>
 </div>
