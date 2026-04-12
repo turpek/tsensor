@@ -96,12 +96,35 @@
                         <div class="space-y-8">
                             <div class="space-y-6">
                                 <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                                    <i class="bi bi-database-down"></i> Amostragem
+                                    <i class="bi bi-database-down"></i> Amostragem & Limites
                                 </h3>
-                                <div>
-                                    <label class="block text-sm font-bold text-slate-700 mb-2 ml-1">Limite do Buffer</label>
-                                    <input type="number" name="total_samples" value="{{ config.acquisition.total_samples }}"
-                                           class="w-full px-4 py-3 text-base border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50 font-extrabold">
+                                
+                                <div class="space-y-5">
+                                    <div class="p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 transition-all focus-within:border-blue-200">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <label class="text-sm font-bold text-slate-700">Limite de Amostras</label>
+                                            <input type="checkbox" name="enable_limit_samples" id="chk-limit-samples" 
+                                                   class="w-5 h-5 rounded-lg border-2 border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                   {% if config.acquisition.total_samples %}checked{% endif %}>
+                                        </div>
+                                        <input type="number" name="total_samples" id="input-total-samples" 
+                                               value="{{ config.acquisition.total_samples or 1000000 }}"
+                                               class="w-full px-0 py-1 text-base bg-transparent outline-none font-extrabold text-blue-600 disabled:text-slate-400 disabled:cursor-not-allowed"
+                                               {% if not config.acquisition.total_samples %}disabled{% endif %}>
+                                    </div>
+
+                                    <div class="p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 transition-all focus-within:border-indigo-200">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <label class="text-sm font-bold text-slate-700">Limite de Tempo (s)</label>
+                                            <input type="checkbox" name="enable_limit_time" id="chk-limit-time"
+                                                   class="w-5 h-5 rounded-lg border-2 border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                   {% if config.acquisition.max_runtime_sec %}checked{% endif %}>
+                                        </div>
+                                        <input type="number" name="max_runtime_sec" id="input-max-runtime" 
+                                               value="{{ config.acquisition.max_runtime_sec or 1800 }}"
+                                               class="w-full px-0 py-1 text-base bg-transparent outline-none font-extrabold text-indigo-600 disabled:text-slate-400 disabled:cursor-not-allowed"
+                                               {% if not config.acquisition.max_runtime_sec %}disabled{% endif %}>
+                                    </div>
                                 </div>
                             </div>
 
@@ -332,6 +355,19 @@
         document.addEventListener('DOMContentLoaded', () => {
             checkStatus();
             const presets = { 'arduino_uno': { vref: 1.1, adc: 1023 }, 'esp32': { vref: 3.3, adc: 4095 } };
+
+            // Controle de Limites (Enable/Disable)
+            const setupLimitToggle = (chkId, inputId) => {
+                const chk = document.getElementById(chkId);
+                const input = document.getElementById(inputId);
+                chk.addEventListener('change', () => {
+                    input.disabled = !chk.checked;
+                    if (chk.checked) input.focus();
+                });
+            };
+
+            setupLimitToggle('chk-limit-samples', 'input-total-samples');
+            setupLimitToggle('chk-limit-time', 'input-max-runtime');
 
             document.getElementById('setup-mcu').addEventListener('change', (e) => {
                 const p = presets[e.target.value];

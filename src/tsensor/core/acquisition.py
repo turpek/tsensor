@@ -71,10 +71,11 @@ def start_acquisition():
                 _current_manager = None
 
         _current_manager = StreamManager(
-            samples=config["acquisition"]["total_samples"],
-            timeout=config["acquisition"]["max_runtime_sec"],
+            samples=config["acquisition"].get("total_samples", 1000000), # Amostras por handler (buffer circular)
+            timeout=config["acquisition"].get("max_runtime_sec"),        # Limite de tempo da sessão
             adc_max=config["sensor"]["adc_max"],
             v_ref=config["sensor"]["v_ref"],
+            total_samples=config["acquisition"].get("total_samples"),    # Limite global de amostras
         )
 
         _acquisition_thread = threading.Thread(

@@ -124,10 +124,21 @@ def update_config():
             data.get("adc_max", config["sensor"]["adc_max"]),
         )
 
-    # Atualiza configurações de aquisição e apresentação
-    config["acquisition"]["total_samples"] = int(
-        data.get("total_samples", config["acquisition"]["total_samples"])
-    )
+    # Atualiza configurações de aquisição
+    # Limite de Amostras
+    if data.get("enable_limit_samples") == "on" or data.get("enable_limit_samples") is True:
+        config["acquisition"]["total_samples"] = int(data.get("total_samples", 1000000))
+    else:
+        # Se desabilitado, removemos a chave (será None no StreamManager)
+        config["acquisition"].pop("total_samples", None)
+
+    # Limite de Tempo
+    if data.get("enable_limit_time") == "on" or data.get("enable_limit_time") is True:
+        config["acquisition"]["max_runtime_sec"] = int(data.get("max_runtime_sec", 1800))
+    else:
+        config["acquisition"].pop("max_runtime_sec", None)
+
+    # Configurações de apresentação
     config["presentation"]["update_interval_ms"] = int(
         data.get(
             "update_interval_ms",
