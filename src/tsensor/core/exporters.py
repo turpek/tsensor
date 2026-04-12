@@ -9,6 +9,7 @@ from typing import Protocol, List, Tuple, Any
 
 import io
 import csv
+import pandas as pd
 
 
 class DataExporter(Protocol):
@@ -129,16 +130,16 @@ class CSVExporter:
 
     def export(self, data: list[tuple[str, float]], destination_name: str) -> bool:
         """
-        Salva a lista de amostras em um arquivo CSV local.
-        O nome do arquivo incluirá um timestamp para evitar colisões.
+        Salva a lista de amostras em um arquivo CSV local de alta performance.
+        Utiliza Pandas para escrita vetorizada, ideal para grandes volumes de dados.
         """
         file_path = self._directory / f"{destination_name}.csv"
 
         try:
-            with open(str(file_path), 'w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
-                writer.writerow(self._header)
-                writer.writerows(data)
+            # Converte a lista (ou deque) diretamente para DataFrame
+            # e utiliza a engine em C do Pandas para escrita ultrarápida
+            df = pd.DataFrame(data, columns=self._header)
+            df.to_csv(file_path, index=False)
 
             logger.info(f"Dados exportados com sucesso para: {file_path}")
             return True
