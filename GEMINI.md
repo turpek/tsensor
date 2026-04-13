@@ -64,3 +64,20 @@
 - Cobertura completa de novos componentes: `test_exporters.py`, `test_handler.py` e validação de dados estáveis no histograma.
 - Configuração de supressão de warnings da Google API no `pyproject.toml`.
 
+## Histórico de Implementações (Sessão 13/04/2026)
+
+### 1. Motor de Histograma (NumPy Integration)
+- Criação da wrapper `numpy_histogram` em `utils.py` para centralizar o cálculo de bins via motor `bins='auto'`.
+- Substituição da lógica customizada pelo motor NumPy em `DataStream`, rotas de API e análise residual.
+- Simplificação dos labels dos gráficos, utilizando arredondamento dinâmico em vez de casas decimais fixas.
+
+### 2. Simulação de Hardware Avançada
+- Implementação de latência dinâmica na `VirtualSerial` calculada via `max_runtime_sec / total_samples`.
+- Calibração de alvos ADC realistas para ESP32 e Arduino (Pressão @ 0.5kPa e 2.0kPa).
+- Adição de ruído gaussiano (sigma) diferenciado por tipo de sensor.
+
+### 3. Otimização de Infraestrutura de Testes
+- Implementação de mocks para `time.sleep` nos testes de simulação.
+- Atualização da suíte de testes de `DataStream` para compatibilidade com binning estatístico dinâmico.
+- Total de 82 testes validados e passando (`pytest -v`).
+
