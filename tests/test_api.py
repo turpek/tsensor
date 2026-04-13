@@ -11,14 +11,15 @@ def mock_handler(mocker):
     handler = mocker.Mock()
     handler.data = DataStream(total_samples=100)
     handler.data_buffer = DataStream(total_samples=100)
-    
+
     # Registra o handler no manager real para o loop do endpoint funcionar
     mocker.patch.dict(manager._handlers, {"Sensor Teste": handler})
-    
+
     # Mock da configuração correspondente
-    mock_sensor_config = [{"name": "Sensor Teste", "calibration": {"v_ref": 3.3, "adc_max": 4095}}]
+    mock_sensor_config = [{"name": "Sensor Teste",
+                           "calibration": {"v_ref": 3.3, "adc_max": 4095}}]
     mocker.patch.dict(config, {"sensors": mock_sensor_config})
-    
+
     mocker.patch("tsensor.routes.api._get_main_handler", return_value=handler)
     return handler
 

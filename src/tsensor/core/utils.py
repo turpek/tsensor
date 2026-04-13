@@ -114,6 +114,17 @@ def detrend(samples: list[float]) -> list[float]:
     return residuals.tolist()
 
 
+def numpy_histogram(samples: np.ndarray, decimals: int = 4) -> dict[str, int]:
+    """Wrapper para o histograma do NumPy com binning automático."""
+    if samples.size == 0:
+        return {}
+
+    counts, bin_edges = np.histogram(samples, bins="auto")
+    labels = [str(round(float(x), decimals)) for x in bin_edges[:-1]]
+
+    return dict(zip(labels, counts.tolist()))
+
+
 def histogram(
     samples: np.ndarray,
     amplitude: float,

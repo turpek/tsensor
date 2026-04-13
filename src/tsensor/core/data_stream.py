@@ -1,5 +1,5 @@
 from collections import deque
-from tsensor.core.utils import histogram, Stat
+from tsensor.core.utils import numpy_histogram, Stat
 from threading import Lock
 from typing import Optional
 
@@ -33,17 +33,11 @@ class DataStream(Stat):
 
     def histogram(
         self,
-        resolucao_adc: float,
+        resolucao_adc: float,  # Mantido apenas para compatibilidade de assinatura se necessário
         decimal_label: int = 1,
     ) -> dict[str, int]:
         data = np.array([d for d in self.data])
-        return histogram(
-            data,
-            self.amplitude,
-            self.moving_average,
-            resolucao_adc=resolucao_adc,
-            decimal_label=decimal_label
-        )
+        return numpy_histogram(data, decimals=decimal_label)
 
     @property
     def sample(self) -> list:

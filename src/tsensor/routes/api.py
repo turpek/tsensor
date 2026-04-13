@@ -1,7 +1,7 @@
 import numpy as np
 from flask import Blueprint, render_template, jsonify, request
 from tsensor.extensions import manager, config, app_status
-from tsensor.core.utils import save_config, detrend, Stat, histogram
+from tsensor.core.utils import save_config, detrend, Stat, numpy_histogram
 from tsensor.core.acquisition import start_acquisition, stop_acquisition
 from tsensor.core.exporters import CSVExporter
 
@@ -19,7 +19,7 @@ def _get_main_handler():
 
 @api_route.route("/residual-analysis", methods=["GET"])
 def get_residual_analysis():
-    """Realiza a análise residual das amostras atuais e retorna o histograma."""
+    """Realiza a análise residual das amostras atuais e retorna o histograma via NumPy."""
     handler = _get_main_handler()
     if not handler:
         return jsonify({"error": "Nenhum sensor configurado."}), 400
@@ -32,24 +32,10 @@ def get_residual_analysis():
     residuals = detrend(temps)
     res_array = np.array(residuals)
 
-    # Usa a classe Stat com inicialização atômica
+    # Usa a classe Stat com inicialização atômica para estatísticas básicas
     stat = Stat(total_samples=len(res_array), initial_data=res_array)
 
-    # Calibração do primeiro sensor
-    cal = config["sensors"][0]["calibration"]
-    v_ref = cal["v_ref"]
-    adc_max = cal["adc_max"]
-    res_c = (v_ref / adc_max) * 100
-
-    decimals = config["presentation"]["decimal_places"] + 1
-
-    hist_dict = histogram(
-        res_array,
-        stat.amplitude,
-        stat.moving_average,
-        resolucao_adc=res_c,
-        decimal_label=decimals,
-    )
+    hist_dict = numpy_histogram(res_array, decimals=6)
 
     return jsonify({
         "labels": list(hist_dict.keys()),
@@ -202,19 +188,9 @@ def get_stats():
 def get_histogram():
     all_histograms = {}
     for name, handler in manager._handlers.items():
-        # Busca a calibração correta para cada sensor
-        sensor_config = next(
-            (s for s in config["sensors"] if s["name"] == name), None)
-        if not sensor_config:
-            continue
+        data = np.array(handler.data.data)
+        hist_dict = numpy_histogram(data, decimals=4)
 
-        cal = sensor_config["calibration"]
-        v_ref = cal["v_ref"]
-        adc_max = cal["adc_max"]
-        res_c = (v_ref / adc_max) * 100
-        decimals = config["presentation"]["decimal_places"]
-
-        hist_dict = handler.data.histogram(res_c, decimal_label=decimals)
         all_histograms[name] = {
             "labels": list(hist_dict.keys()),
             "values": list(hist_dict.values()),

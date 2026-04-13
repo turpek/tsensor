@@ -7,14 +7,14 @@ from serial import Serial as _RealSerial, SerialException
 # Tabela de referência: (mcu, vref) -> targets de ADC
 SIM_DATA = {
     ("esp32", 3.3): {
-        "P": 14707010,
+        "P": 15358544,  # Alvo: 0.5 kPa
         "LM35": 310,
         "NTC": 2047,
         "sigma_t": 2,
         "sigma_p": 500
     },
     ("arduino_uno", 5.0): {
-        "P": 9706626,
+        "P": 11162548,  # Alvo: 2.0 kPa
         "LM35": 51,
         "NTC": 511,
         "sigma_t": 1,
@@ -54,12 +54,17 @@ class VirtualSerial:
         self.targets = SIM_DATA.get((mcu, vref), DEFAULT_TARGETS)
         self.active_models = [s["model"] for s in config["sensors"]]
 
+        # Calcula latência baseada nos limites de aquisição
+        runtime = config["acquisition"].get("max_runtime_sec", 1800)
+        samples = config["acquisition"].get("total_samples", 1000000)
+        self.latency = runtime / samples if samples > 0 else 0.1
+
         logger.info(
-            f"VIRTUAL SERIAL: Simulando {mcu.upper()} @ {vref}V (Targets: {self.targets})")
+            f"VIRTUAL SERIAL: Simulando {mcu.upper()} @ {vref}V (Latency: {self.latency:.4f}s)")
 
     def readline(self) -> bytes:
         """Gera dados simulados com ruído gaussiano baseado no hardware configurado."""
-        time.sleep(0.1)  # Latência de 10Hz
+        time.sleep(self.latency)
 
         # Decide qual prefixo enviar (T ou P)
         prefix = random.choice(["T", "P"])
