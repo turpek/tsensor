@@ -202,6 +202,13 @@
                                         <option value="ERROR" {% if config.presentation.log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
                                     </select>
                                 </div>
+
+                                <div class="p-5 bg-indigo-50/50 rounded-2xl border-2 border-indigo-100">
+                                    <label class="block text-[13px] font-bold text-indigo-900 mb-2 ml-1">Latência da Simulação (µs)</label>
+                                    <input type="number" name="simulation_latency_us" value="{{ config.hardware.simulation_latency_us or 100000 }}"
+                                           class="w-full px-4 py-2.5 text-sm border-2 border-white rounded-xl focus:border-indigo-500 outline-none bg-white font-mono font-bold text-indigo-600">
+                                    <p class="text-[10px] text-indigo-400 mt-2 ml-1 leading-tight">Define o atraso entre amostras no modo VirtualSerial. (1000µs = 1ms)</p>
+                                </div>
                             </div>
 
                             <div class="p-5 bg-blue-50 rounded-2xl border-2 border-blue-100 flex items-start gap-4">
@@ -778,6 +785,7 @@
                     port: formData.get('port'),
                     mcu: formData.get('mcu'),
                     baudrate: formData.get('baudrate'),
+                    simulation_latency_us: parseInt(formData.get('simulation_latency_us') || 100000),
                     enable_limit_samples: formData.get('enable_limit_samples') === 'on',
                     total_samples: formData.get('total_samples'),
                     enable_limit_time: formData.get('enable_limit_time') === 'on',

@@ -54,13 +54,12 @@ class VirtualSerial:
         self.targets = SIM_DATA.get((mcu, vref), DEFAULT_TARGETS)
         self.active_models = [s["model"] for s in config["sensors"]]
 
-        # Calcula latência baseada nos limites de aquisição
-        runtime = config["acquisition"].get("max_runtime_sec", 1800)
-        samples = config["acquisition"].get("total_samples", 1000000)
-        self.latency = runtime / samples if samples > 0 else 0.1
+        # Carrega latência configurada (Padrão 100ms se ausente)
+        latency_us = config["hardware"].get("simulation_latency_us", 100000)
+        self.latency = latency_us / 1_000_000.0
 
         logger.info(
-            f"VIRTUAL SERIAL: Simulando {mcu.upper()} @ {vref}V (Latency: {self.latency:.4f}s)")
+            f"VIRTUAL SERIAL: Simulando {mcu.upper()} @ {vref}V (Latency: {self.latency:.6f}s)")
 
     def readline(self) -> bytes:
         """Gera dados simulados com ruído gaussiano baseado no hardware configurado."""

@@ -25,6 +25,7 @@ DEFAULT_CONFIG = {
         "baudrate": 115200,
         "timeout": 1.0,
         "mcu": "esp32",
+        "simulation_latency_us": 100000,
     },
     "sensors": [],  # Inicia sem nenhum sensor por padrão
     "acquisition": {
