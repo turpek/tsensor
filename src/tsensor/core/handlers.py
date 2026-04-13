@@ -161,10 +161,10 @@ class LM35Handler(TemperatureHandler):
 
 class MPS20Handler(PressureHandler):
     def _convert(self, adc: int):
-        v_no_adc_mv = (adc * self._v_ref * 1000) / 2 ** 24
-
-        # 3. Divide pelo Ganho de 128 para saber o que o SENSOR gerou de verdade
-        v_sensor_mv = v_no_adc_mv / 128.0
+        B = 128  # ganho
+        adc_max = 2 ** 24
+        v_ref_milli = self._v_ref * 1000
+        v_sensor_mv = (adc * v_ref_milli) / (B * adc_max)
         press = (v_sensor_mv - self._offset) / self._sensitivity
         return round(press, 4)
 
