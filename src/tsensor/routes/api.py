@@ -56,30 +56,66 @@ def get_residual_analysis():
 
 @api_route.route("/export", methods=["POST"])
 def export_data():
-    """Exporta os dados atuais para um arquivo CSV local."""
-    handler = _get_main_handler()
-    if not handler:
+    """Exporta os dados de todos os sensores em colunas paralelas (Wide Format)."""
+    if not manager or len(manager) == 0:
         return jsonify({"error": "Nenhum sensor configurado."}), 400
 
     try:
         export_dir = "exports"
-        exporter = CSVExporter(
-            directory=export_dir,
-            header=["timestamp", "temperatura"]
-        )
-        exporter.setup()
+        
+        # Coleta dados por sensor e identifica o tamanho máximo
+        sensor_data = {}
+        max_len = 0
+        sensor_names = list(manager._handlers.keys())
+        
+        for name in sensor_names:
+            samples = manager._handlers[name].data.sample
+            sensor_data[name] = samples
+            if len(samples) > max_len:
+                max_len = len(samples)
 
-        data = handler.data.sample
-        if not data:
+        if max_len == 0:
             return jsonify({"error": "Não há dados para exportar."}), 400
 
-        from datetime import datetime
-        file_name = f"sessao_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        # Constrói o cabeçalho dinâmico e a linha de comentário para identificação
+        header = []
+        comment_parts = []
+        for name in sensor_names:
+            # Pega o tipo para o cabeçalho (ex: temperature, pressure)
+            sensor_config = next((s for s in config["sensors"] if s["name"] == name), {})
+            s_type = sensor_config.get("type", "valor")
+            
+            header.extend(["timestamp", s_type])
+            comment_parts.append(f"{name}; ") # Espaçamento para as duas colunas
+            
+        comment_line = "; ".join(comment_parts)
 
-        success = exporter.export(data, file_name)
+        # Prepara as linhas alinhando as amostras
+        rows = []
+        for i in range(max_len):
+            row = []
+            for name in sensor_names:
+                samples = sensor_data[name]
+                if i < len(samples):
+                    row.extend([samples[i][0], samples[i][1]])
+                else:
+                    row.extend(["", ""]) # Padding para sensores com menos amostras
+            rows.append(row)
+
+        exporter = CSVExporter(directory=export_dir, header=header)
+        exporter.setup()
+
+        from datetime import datetime
+        file_name = f"sessao_paralela_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+        # Exporta com separador ';' e linha de comentário
+        success = exporter.export(rows, file_name, sep=";", comment=comment_line)
 
         if success:
-            return jsonify({"success": True, "message": f"Dados salvos em {export_dir}/{file_name}.csv"})
+            n = len(sensor_names)
+            sensor_str = "sensor" if n == 1 else "sensores"
+            msg = f"Dados de {n} {sensor_str} exportados lado a lado em {export_dir}/{file_name}.csv"
+            return jsonify({"success": True, "message": msg})
         else:
             return jsonify({"error": "Falha ao salvar arquivo CSV."}), 500
 
@@ -244,11 +280,17 @@ matplotlib.use("Agg")  # Backend não interativo para web
 import matplotlib.pyplot as plt
 
 
+from scipy.interpolate import make_interp_spline
+
+
 @api_route.route("/download-charts-zip", methods=["GET"])
 def download_charts_zip():
-    """Gera todos os gráficos no backend usando Matplotlib e retorna um ZIP."""
+    """Gera todos os gráficos no backend usando Matplotlib e retorna um ZIP com unidades e suavização."""
     if not manager or len(manager) == 0:
         return jsonify({"error": "Nenhum sensor configurado."}), 400
+
+    # Mapeamento de unidades
+    units = {"temperature": "°C", "pressure": "kPa"}
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w") as zf:
@@ -257,18 +299,42 @@ def download_charts_zip():
         for name, handler in manager._handlers.items():
             safe_name = name.replace(" ", "_")
             
-            # 1. Gráfico de Série Temporal
+            # Busca o tipo do sensor no config para determinar a unidade
+            sensor_config = next((s for s in config["sensors"] if s["name"] == name), {})
+            s_type = sensor_config.get("type", "sensor")
+            unit = units.get(s_type, "")
+            
+            # 1. Gráfico de Série Temporal (Suavizado com Spline)
             data_points = handler.time_series.sample
             if data_points:
                 labels = [p[0] for p in data_points]
-                values = [p[1] for p in data_points]
+                values = np.array([p[1] for p in data_points])
+                indices = np.arange(len(values))
                 
                 plt.figure(figsize=(10, 6), dpi=100)
-                plt.plot(labels, values, color="#6366f1", linewidth=2, marker="o", markersize=4)
+                
+                # Se houver pontos suficientes (mín 4 para cubic spline), suavizamos a linha
+                if len(values) >= 4:
+                    indices_new = np.linspace(indices.min(), indices.max(), 300)
+                    spline = make_interp_spline(indices, values, k=3)
+                    values_smooth = spline(indices_new)
+                    
+                    # Desenha a linha suave e os pontos reais (como marcadores discretos)
+                    plt.plot(indices_new, values_smooth, color="#6366f1", linewidth=2.5, alpha=0.8, label="Tendência")
+                    plt.scatter(indices, values, color="#4f46e5", s=25, zorder=5, label="Amostras")
+                else:
+                    # Fallback para linha simples com marcadores
+                    plt.plot(indices, values, color="#6366f1", linewidth=2, marker="o", markersize=6)
+
                 plt.title(f"Série Temporal: {name}", fontsize=14, fontweight="bold")
                 plt.xlabel("Tempo", fontsize=10)
-                plt.ylabel("Valor", fontsize=10)
-                plt.xticks(rotation=45, fontsize=8)
+                plt.ylabel(f"Valor ({unit})" if unit else "Valor", fontsize=10)
+                
+                # Ajusta os ticks do eixo X (tempo) para não encavalar
+                step = max(1, len(labels) // 10)
+                plt.xticks(indices[::step], [labels[i] for i in range(0, len(labels), step)], rotation=45, fontsize=8)
+                
+                plt.grid(True, linestyle="--", alpha=0.5)
                 plt.tight_layout()
                 
                 img_io = io.BytesIO()
@@ -282,7 +348,7 @@ def download_charts_zip():
                 plt.figure(figsize=(10, 6), dpi=100)
                 plt.hist(data_raw, bins="auto", color="#3b82f6", alpha=0.7, edgecolor="white")
                 plt.title(f"Distribuição de Dados: {name}", fontsize=14, fontweight="bold")
-                plt.xlabel("Valor", fontsize=10)
+                plt.xlabel(f"Valor ({unit})" if unit else "Valor", fontsize=10)
                 plt.ylabel("Frequência", fontsize=10)
                 plt.grid(axis="y", linestyle="--", alpha=0.7)
                 plt.tight_layout()
@@ -298,7 +364,7 @@ def download_charts_zip():
                 plt.figure(figsize=(10, 6), dpi=100)
                 plt.hist(residuals, bins="auto", color="#818cf8", alpha=0.7, edgecolor="white")
                 plt.title(f"Análise Residual (Ruído): {name}", fontsize=14, fontweight="bold")
-                plt.xlabel("Desvio (Resíduo)", fontsize=10)
+                plt.xlabel(f"Desvio ({unit})" if unit else "Desvio", fontsize=10)
                 plt.ylabel("Frequência", fontsize=10)
                 plt.grid(axis="y", linestyle="--", alpha=0.7)
                 plt.tight_layout()

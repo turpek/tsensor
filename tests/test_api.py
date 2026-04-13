@@ -191,10 +191,9 @@ def test_api_restart_restarts_acquisition(client, mocker):
 
 
 def test_api_export_success(client, mock_handler, mocker):
-    """Verifica se /api/export chama o exportador CSV corretamente com sucesso."""
-    # Simula dados no sample (propriedade do DataStream)
-    mocker.patch.object(DataStream, "sample",
-                        return_value=[("10:00:01", 25.0)])
+    """Verifica se /api/export chama o exportador CSV com colunas paralelas (Wide Format)."""
+    # Adiciona dados reais ao handler registrado no manager
+    mock_handler.data.add(25.0, timestamp="10:00:01")
 
     mock_exporter_cls = mocker.patch("tsensor.routes.api.CSVExporter")
     mock_exporter_inst = mock_exporter_cls.return_value
@@ -204,9 +203,29 @@ def test_api_export_success(client, mock_handler, mocker):
 
     assert response.status_code == 200
     assert response.json["success"] is True
-    assert "Dados salvos" in response.json["message"]
+    assert "lado a lado" in response.json["message"]
+    
+    # Verifica o cabeçalho dinâmico (no mock_handler o tipo padrão no config mockado é omitido, cai no 'valor')
+    # No mock_handler definido no topo do arquivo, o config['sensors'] tem type não definido explicitamente (cai no default 'valor')
+    # Mas vamos ver o que o config mockado na fixture mock_handler tem:
+    # mock_sensor_config = [{"name": "Sensor Teste", ...}] -> não tem 'type'
+    expected_header = ["timestamp", "valor"]
+    
+    mock_exporter_cls.assert_called_once_with(
+        directory="exports",
+        header=expected_header
+    )
+    
     mock_exporter_inst.setup.assert_called_once()
+    
+    # Verifica se os dados foram alinhados lado a lado
+    # Como só temos 1 sensor no manager do mock, teremos [ts, val]
+    expected_rows = [["10:00:01", 25.0]]
     mock_exporter_inst.export.assert_called_once()
+    args, kwargs = mock_exporter_inst.export.call_args
+    assert args[0] == expected_rows
+    assert kwargs["sep"] == ";"
+    assert "Sensor Teste" in kwargs["comment"]
 
 
 def test_api_export_no_data_fails(client, mock_handler, mocker):

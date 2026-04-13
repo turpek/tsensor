@@ -408,9 +408,13 @@
                     return;
                 }
 
-                // Atualiza Cards
-                document.getElementById('residual-mean').innerText = data.stats.mean.toFixed(6);
-                document.getElementById('residual-std').innerText = data.stats.std.toFixed(6);
+                // Atualiza Cards com Unidades
+                const sensors = {{ config.sensors | tojson }};
+                const s_config = sensors.find(s => s.name === sensorName);
+                const unit = s_config ? (S_UNITS[s_config.type] || "") : "";
+
+                document.getElementById('residual-mean').innerText = `${data.stats.mean.toFixed(6)} ${unit}`;
+                document.getElementById('residual-std').innerText = `${data.stats.std.toFixed(6)} ${unit}`;
                 document.getElementById('residual-n').innerText = data.stats.n;
 
                 // Renderiza Gráfico
@@ -418,6 +422,8 @@
                 if (residualChartInstance) {
                     residualChartInstance.data.labels = data.labels;
                     residualChartInstance.data.datasets[0].data = data.values;
+                    // Atualiza título do eixo X
+                    residualChartInstance.options.scales.x.title.text = `Desvio (${unit})`;
                     residualChartInstance.update();
                 } else {
                     residualChartInstance = new Chart(ctx, {
@@ -434,10 +440,20 @@
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
+                            plugins: { 
+                                legend: { display: false },
+                                tooltip: { callbacks: { label: (ctx) => `${ctx.raw} ocorrências` } }
+                            },
                             scales: {
-                                y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
-                                x: { grid: { display: false } }
+                                y: { 
+                                    beginAtZero: true, 
+                                    grid: { color: '#f1f5f9' },
+                                    title: { display: true, text: 'Frequência', font: { size: 10, weight: 'bold' } }
+                                },
+                                x: { 
+                                    grid: { display: false },
+                                    title: { display: true, text: `Desvio (${unit})`, font: { size: 10, weight: 'bold' } }
+                                }
                             }
                         }
                     });
@@ -603,21 +619,29 @@
             }
         }
 
+        const S_UNITS = { "temperature": "°C", "pressure": "kPa" };
+
         $cruConfig({
             callbacks: {
                 updateDashboardValues: (allData) => {
                     if (!allData) return;
+                    
+                    const sensors = {{ config.sensors | tojson }};
+                    
                     for (const [name, data] of Object.entries(allData)) {
                         const safeName = name.replace(/\s+/g, '-');
                         const nEl = document.getElementById(`n-${safeName}`);
                         if (!nEl) continue;
 
-                        // Atualiza Números
+                        const s_config = sensors.find(s => s.name === name);
+                        const unit = s_config ? (S_UNITS[s_config.type] || "") : "";
+
+                        // Atualiza Números com Unidade
                         nEl.innerText = data.stats.n;
-                        document.getElementById(`mean-${safeName}`).innerText = data.stats.mean.toFixed(4);
-                        document.getElementById(`std-${safeName}`).innerText = data.stats.std.toFixed(4);
-                        document.getElementById(`min-${safeName}`).innerText = data.stats.min.toFixed(2);
-                        document.getElementById(`max-${safeName}`).innerText = data.stats.max.toFixed(2);
+                        document.getElementById(`mean-${safeName}`).innerText = `${data.stats.mean.toFixed(4)} ${unit}`;
+                        document.getElementById(`std-${safeName}`).innerText = `${data.stats.std.toFixed(4)} ${unit}`;
+                        document.getElementById(`min-${safeName}`).innerText = `${data.stats.min.toFixed(2)} ${unit}`;
+                        document.getElementById(`max-${safeName}`).innerText = `${data.stats.max.toFixed(2)} ${unit}`;
 
                         // 1. Atualiza Histograma (Bar Chart)
                         const canvasEl = document.getElementById(`canvas-${safeName}`);
@@ -631,7 +655,19 @@
                                 chartInstances[name] = new Chart(ctx, {
                                     type: 'bar',
                                     data: { labels: data.histogram.labels, datasets: [{ data: data.histogram.values, backgroundColor: 'rgba(59, 130, 246, 0.7)', borderRadius: 12 }] },
-                                    options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false }, ticks: { font: { size: 9 } } } } }
+                                    options: { 
+                                        responsive: true, 
+                                        maintainAspectRatio: false, 
+                                        animation: false, 
+                                        plugins: { 
+                                            legend: { display: false },
+                                            tooltip: { callbacks: { label: (ctx) => `${ctx.raw} ocorrências` } }
+                                        }, 
+                                        scales: { 
+                                            y: { beginAtZero: true, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Frequência', font: { size: 10, weight: 'bold' } } }, 
+                                            x: { grid: { display: false }, ticks: { font: { size: 9 } }, title: { display: true, text: `Valor (${unit})`, font: { size: 10, weight: 'bold' } } } 
+                                        } 
+                                    }
                                 });
                             }
                         }
@@ -665,7 +701,7 @@
                                         animation: false, 
                                         plugins: { legend: { display: false } }, 
                                         scales: { 
-                                            y: { grid: { color: '#f1f5f9' } }, 
+                                            y: { grid: { color: '#f1f5f9' }, title: { display: true, text: `Valor (${unit})`, font: { size: 10, weight: 'bold' } } }, 
                                             x: { 
                                                 display: true,
                                                 grid: { display: false },
@@ -851,7 +887,7 @@
                     const res = await fetch('/api/export', { method: 'POST' });
                     const result = await res.json();
                     if (result.success) {
-                        showToast("Exportação concluída!");
+                        showToast(result.message || "Exportação concluída!");
                     } else {
                         showToast(result.error, 'error');
                     }

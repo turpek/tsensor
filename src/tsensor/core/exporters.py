@@ -128,18 +128,22 @@ class CSVExporter:
             logger.info(f"Diretório de exportação criado: {self._directory}")
         return self._directory
 
-    def export(self, data: list[tuple[str, float]], destination_name: str) -> bool:
+    def export(self, data: Any, destination_name: str, sep: str = ";", comment: str = None) -> bool:
         """
-        Salva a lista de amostras em um arquivo CSV local de alta performance.
-        Utiliza Pandas para escrita vetorizada, ideal para grandes volumes de dados.
+        Salva os dados em um arquivo CSV local.
+        Suporta opcionalmente uma linha de comentário no topo e separador customizado.
         """
         file_path = self._directory / f"{destination_name}.csv"
 
         try:
-            # Converte a lista (ou deque) diretamente para DataFrame
-            # e utiliza a engine em C do Pandas para escrita ultrarápida
             df = pd.DataFrame(data, columns=self._header)
-            df.to_csv(file_path, index=False)
+            
+            if comment:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(f"# {comment}\n")
+                df.to_csv(file_path, index=False, sep=sep, mode='a')
+            else:
+                df.to_csv(file_path, index=False, sep=sep)
 
             logger.info(f"Dados exportados com sucesso para: {file_path}")
             return True
