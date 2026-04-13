@@ -1,6 +1,6 @@
 import time
 import pytest
-from tsensor.core.handlers import NTCHandler, LM35Handler, StreamManager
+from tsensor.core.handlers import NTCHandler, LM35Handler, MPS20Handler, StreamManager
 from tsensor.core.data_stream import DataStream
 
 # --- FIXTURES ---
@@ -31,6 +31,19 @@ def lm35_handler(data_streams):
         data_buffer=data_buffer,
         adc_max=1023,
         v_ref=1.1,
+    )
+
+
+@pytest.fixture
+def mps20_handler(data_streams):
+    data, data_buffer = data_streams
+    return MPS20Handler(
+        data=data,
+        data_buffer=data_buffer,
+        adc_max=4095,
+        v_ref=3.3,
+        offset=22.6,
+        sensitivity=1.6949
     )
 
 
@@ -140,3 +153,57 @@ def test_stream_manager_is_active_based_on_max_samples_per_sensor(stream_manager
 
     assert stream_manager.is_active is False
     assert stream_manager.count_samples == 10
+
+
+# --- TESTES PARA MPS20HANDLER ---
+
+
+def test_mps20_conversion_logic(mps20_handler):
+    """Valida a fórmula matemática de conversão de pressão (Repouso)."""
+    # Valor de referência p/ 0 kPa no ESP32 @ 3.3V
+    adc_value = 14707010
+    # Deve resultar em aproximadamente 0 kPa
+    assert mps20_handler._convert(adc_value) == pytest.approx(0, abs=1e-2)
+
+
+def test_mps20_handle_valid_prefix(mps20_handler):
+    """Verifica se o handler processa corretamente o prefixo P= com 24 bits."""
+    line = "P=14707010"
+    success = mps20_handler.handle(line)
+    assert success is True
+    assert len(mps20_handler.data) == 1
+    # Pressão de repouso ~ 0.0
+    assert mps20_handler.data.data[0] == pytest.approx(0, abs=1e-2)
+
+
+def test_mps20_handle_ignores_wrong_prefix(mps20_handler):
+    """Garante que o handler de pressão ignora dados de temperatura (T=)."""
+    line = "T=2500"
+    success = mps20_handler.handle(line)
+    assert success is False
+    assert len(mps20_handler.data) == 0
+
+
+def test_mps20_custom_calibration():
+    """Valida se o handler respeita offsets e sensibilidades customizadas."""
+    # Usando valores realistas para 24 bits
+    v_ref = 5.0
+    offset = 10.0
+    sensitivity = 2.0
+
+    custom_handler = MPS20Handler(
+        data=DataStream(10),
+        data_buffer=DataStream(10),
+        adc_max=4095,  # Não usado na fórmula fixa de 24 bits
+        v_ref=v_ref,
+        offset=offset,
+        sensitivity=sensitivity
+    )
+
+    # Simula um valor de ADC que resultaria em 15.0 mV no sensor
+    # v_sensor_mv = 15.0 -> v_no_adc_mv = 15.0 * 128 = 1920.0
+    # adc = (1920.0 * 2**24) / (v_ref * 1000)
+    adc_target = int((1920.0 * (2**24)) / (v_ref * 1000))
+
+    # Esperado: (15.0 - 10.0) / 2.0 = 2.5 kPa
+    assert custom_handler._convert(adc_target) == pytest.approx(2.5, abs=1e-2)

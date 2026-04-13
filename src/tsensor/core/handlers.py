@@ -35,6 +35,57 @@ class SerialHandler(Protocol):
         ...
 
 
+class PressureHandler(ABC):
+    def __init__(
+        self,
+        data: DataStream,
+        data_buffer: DataStream,
+        adc_max: int,
+        v_ref: float,
+        offset: float = 22.6,
+        sensitivity: float = 1.6949
+    ):
+        self._data = data
+        self._data_buffer = data_buffer
+        self._adc_max = adc_max
+        self._v_ref = v_ref
+        self._offset = offset
+        self._sensitivity = sensitivity
+        self._re = re.compile(f"P={REG_ADC_VALUE}")
+
+    def _str_to_int(self, line: str) -> None | int:
+        match = self._re.search(line)
+        if match:
+            return int(match.group(1))
+        else:
+            logger.warning(
+                f"Ruído ou padrão 'P=' não encontrado na linha: '{line}'")
+        return None
+
+    @abstractmethod
+    def _convert(self, adc: int):
+        ...
+
+    def handle(self, line: str) -> bool:
+        adc = self._str_to_int(line)
+        if adc is not None:
+            pressure = self._convert(adc)
+            time_now = timestamp()
+            logger.debug(f"pressao: {pressure:.4f}")
+            self._data.add(pressure, time_now)
+            self._data_buffer.add(pressure, time_now)
+            return True
+        return False
+
+    @property
+    def data_buffer(self) -> DataStream:
+        return self._data_buffer
+
+    @property
+    def data(self) -> DataStream:
+        return self._data
+
+
 class TemperatureHandler(ABC):
     def __init__(
         self,
@@ -108,6 +159,16 @@ class LM35Handler(TemperatureHandler):
         return round(temp, 4)
 
 
+class MPS20Handler(PressureHandler):
+    def _convert(self, adc: int):
+        v_no_adc_mv = (adc * self._v_ref * 1000) / 2 ** 24
+
+        # 3. Divide pelo Ganho de 128 para saber o que o SENSOR gerou de verdade
+        v_sensor_mv = v_no_adc_mv / 128.0
+        press = (v_sensor_mv - self._offset) / self._sensitivity
+        return round(press, 4)
+
+
 class StreamManager:
     def __init__(self):
         self._timeout: Optional[int]
@@ -170,4 +231,5 @@ class StreamManager:
 HANDLERS = {
     "LM35": LM35Handler,
     "NTC": NTCHandler,
+    "MPS20N0040D": MPS20Handler,
 }
