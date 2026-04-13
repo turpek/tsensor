@@ -284,3 +284,38 @@ def test_api_config_rejects_empty_sensors_list(client, mocker):
 
     assert response.status_code == 400
     assert "pelo menos um sensor" in response.get_json()["error"]
+
+
+def test_api_download_charts_zip_success(client, mock_handler, mocker):
+    """Verifica se /api/download-charts-zip gera um arquivo ZIP com os gráficos."""
+    import io
+    import zipfile
+
+    # Popula o handler com dados fictícios para gerar gráficos
+    for i in range(5):
+        mock_handler.data.add(20.0 + i, timestamp=f"10:00:0{i}")
+        mock_handler.time_series.add(20.0 + i, timestamp=f"10:00:0{i}")
+
+    response = client.get("/api/download-charts-zip")
+
+    assert response.status_code == 200
+    assert response.headers["Content-Type"] == "application/zip"
+    assert "attachment" in response.headers["Content-Disposition"]
+    assert "tsensor_charts" in response.headers["Content-Disposition"]
+
+    # Valida o conteúdo do ZIP
+    with zipfile.ZipFile(io.BytesIO(response.data)) as zf:
+        file_list = zf.namelist()
+        # Deve conter pelo menos a série temporal, histograma e resíduos para o sensor testado
+        assert any("serie_temporal_Sensor_Teste" in f for f in file_list)
+        assert any("histograma_Sensor_Teste" in f for f in file_list)
+        assert any("residuos_Sensor_Teste" in f for f in file_list)
+
+
+def test_api_download_charts_zip_no_sensors(client, mocker):
+    """Verifica se a rota retorna erro quando não há handlers registrados."""
+    mocker.patch("tsensor.routes.api.manager", [])
+    
+    response = client.get("/api/download-charts-zip")
+    assert response.status_code == 400
+    assert "Nenhum sensor configurado" in response.get_json()["error"]
