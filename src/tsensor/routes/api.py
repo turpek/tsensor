@@ -20,9 +20,15 @@ def _get_main_handler():
 @api_route.route("/residual-analysis", methods=["GET"])
 def get_residual_analysis():
     """Realiza a análise residual das amostras atuais e retorna o histograma via NumPy."""
-    handler = _get_main_handler()
+    sensor_name = request.args.get("sensor")
+
+    if sensor_name:
+        handler = manager.get_handler(sensor_name)
+    else:
+        handler = _get_main_handler()
+
     if not handler:
-        return jsonify({"error": "Nenhum sensor configurado."}), 400
+        return jsonify({"error": "Sensor não encontrado ou não configurado."}), 400
 
     temps = handler.data.data
     if not temps:
@@ -174,7 +180,14 @@ def get_stats():
     all_stats = {}
     for name, handler in manager._handlers.items():
         ds = handler.data
+
+        # Busca o tipo do sensor no config
+        sensor_config = next(
+            (s for s in config["sensors"] if s["name"] == name), {})
+        sensor_type = sensor_config.get("type", "Sensor")
+
         all_stats[name] = {
+            "type": sensor_type,
             "n": len(ds),
             "mean": ds.mean,
             "std": ds.std,
@@ -188,12 +201,20 @@ def get_stats():
 def get_histogram():
     all_histograms = {}
     for name, handler in manager._handlers.items():
-        data = np.array(handler.data.data)
+        ds = handler.data
+        data = np.array(ds.data)
         hist_dict = numpy_histogram(data, decimals=4)
 
         all_histograms[name] = {
             "labels": list(hist_dict.keys()),
             "values": list(hist_dict.values()),
+            "stats": {
+                "n": len(ds),
+                "mean": ds.mean,
+                "std": ds.std,
+                "min": ds.min if ds.min != float("inf") else 0,
+                "max": ds.max if ds.max != -float("inf") else 0,
+            }
         }
 
     return jsonify(all_histograms)
