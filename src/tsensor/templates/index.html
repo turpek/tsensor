@@ -314,12 +314,12 @@
                     <p id="max-{{ sensor.name|replace(' ', '-') }}" class="text-2xl font-black text-slate-700">-</p>
                 </div>
 
-                <div class="col-span-full mt-4">
-                    <div class="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 h-[280px] relative">
-                        <div class="absolute top-4 left-6 flex items-center gap-2 z-10">
-                            <div class="w-1.5 h-4 bg-blue-500 rounded-full"></div>
-                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Distribuição Real-Time</span>
-                        </div>
+                <div class="col-span-full mt-12 max-w-4xl mx-auto w-full">
+                    <div class="flex items-center gap-2 mb-4 ml-6">
+                        <div class="w-1.5 h-4 bg-blue-500 rounded-full"></div>
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Distribuição Real-Time</span>
+                    </div>
+                    <div class="bg-slate-50/50 rounded-[2.5rem] p-8 border border-slate-100 h-[400px] transition-all hover:bg-white hover:shadow-xl">
                         <canvas id="canvas-{{ sensor.name|replace(' ', '-') }}"></canvas>
                     </div>
                 </div>
