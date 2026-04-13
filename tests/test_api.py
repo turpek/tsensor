@@ -68,9 +68,13 @@ def test_api_stats_empty_stream(client, mock_handler):
 
 
 def test_api_histogram_returns_json_with_mocked_values(client, mock_handler):
-    """Testa a rota /api/histogram com valores mockados."""
+    """Testa a rota /api/histogram com valores mockados e série temporal."""
+    # Adiciona dados ao stream principal
     for val in [10.0, 20.0, 30.0, 40.0, 50.0]:
         mock_handler.data.add(val, timestamp="10:00:00:000")
+    
+    # Simula dados na série temporal (decimada)
+    mock_handler.time_series.add(30.0, timestamp="10:00:05")
 
     response = client.get("/api/histogram")
 
@@ -78,11 +82,18 @@ def test_api_histogram_returns_json_with_mocked_values(client, mock_handler):
     assert response.is_json
 
     data = response.get_json()
-    assert "Sensor Teste" in data
-    assert "histogram" in data["Sensor Teste"]
-    assert "labels" in data["Sensor Teste"]["histogram"]
-    # No histograma, a soma dos valores deve ser igual ao número de amostras
-    assert sum(data["Sensor Teste"]["histogram"]["values"]) == 5
+    sensor_data = data["Sensor Teste"]
+    
+    # Valida Histograma
+    assert "histogram" in sensor_data
+    assert "labels" in sensor_data["histogram"]
+    assert sum(sensor_data["histogram"]["values"]) == 5
+    
+    # Valida Série Temporal (Campos labels e values no topo do objeto do sensor)
+    assert "labels" in sensor_data
+    assert "values" in sensor_data
+    assert sensor_data["labels"][0] == "10:00:05"
+    assert sensor_data["values"][0] == 30.0
 
 
 def test_api_histogram_empty_stream(client, mock_handler):
