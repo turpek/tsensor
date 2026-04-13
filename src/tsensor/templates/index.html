@@ -19,110 +19,207 @@
 </head>
 <body class="text-slate-900 antialiased">
 
-    <!-- Modal de Configuração (Preservado conforme original) -->
+    <!-- Setup Overlay -->
     <div id="setup-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-        <div class="bg-white rounded-[2.5rem] shadow-2xl max-w-5xl w-full border border-slate-200 overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-300">
-            <div class="md:w-1/3 bg-slate-900 p-10 text-white flex flex-col justify-between border-r border-slate-800">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-slate-200 overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-300">
+            
+            <!-- Lateral Esquerda: Info & Status -->
+            <div class="bg-slate-50 p-10 md:w-1/3 border-r border-slate-100 flex flex-col justify-between">
                 <div>
-                    <div class="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mb-8 shadow-2xl shadow-blue-500/20">
-                        <i class="bi bi-sliders text-3xl"></i>
+                    <div class="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-200">
+                        <i class="bi bi-sliders2-vertical text-3xl"></i>
                     </div>
-                    <h2 class="text-3xl font-black mb-4 tracking-tighter leading-tight">Configurações<br>do Sistema</h2>
-                    <p class="text-slate-400 text-sm leading-relaxed font-medium">Ajuste os parâmetros de hardware e gerencie sua lista de sensores para aquisição precisa.</p>
-                    <div class="mt-12 space-y-5">
-                        <div class="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
-                            <i class="bi bi-cpu text-blue-400 text-xl"></i>
-                            <div>
-                                <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Plataforma</p>
-                                <p id="status-mcu" class="text-sm font-bold">{{ config.hardware.mcu|upper }}</p>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
-                            <i class="bi bi-usb-symbol text-green-400 text-xl"></i>
-                            <div>
-                                <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Porta Serial</p>
-                                <p id="status-port" class="text-sm font-mono font-bold">{{ config.hardware.port }}</p>
-                            </div>
-                        </div>
-                    </div>
+                    <h2 class="text-2xl font-black text-slate-800 leading-tight mb-4">Ajustes do <span class="text-blue-600">Sistema</span></h2>
+                    <p class="text-slate-500 text-sm leading-relaxed font-medium">Configure os parâmetros de comunicação serial e sensor para iniciar a monitoração.</p>
                 </div>
-                <div class="pt-8 border-t border-white/10">
-                    <div class="flex items-center gap-3">
-                        <div class="w-2.5 h-2.5 bg-green-500 rounded-full animate-ping"></div>
-                        <span class="text-[11px] font-black tracking-widest text-slate-400 uppercase">Motor de Aquisição Ativo</span>
+
+                <div class="mt-8 space-y-4">
+                    <div class="flex items-start gap-3 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                        <i class="bi bi-info-circle-fill text-blue-500 mt-0.5"></i>
+                        <p class="text-[11px] text-slate-600 leading-snug font-medium">As alterações serão aplicadas e a conexão será testada imediatamente.</p>
                     </div>
                 </div>
             </div>
 
-            <div class="p-10 md:w-2/3 bg-white overflow-y-auto max-h-[90vh] custom-scrollbar relative">
-                <button id="close-setup" class="absolute right-8 top-8 text-slate-400 hover:text-slate-900 transition-colors p-2 hover:bg-slate-100 rounded-full">
+            <!-- Lateral Direita: Formulário -->
+            <div class="p-8 md:w-2/3 bg-white overflow-y-auto max-h-[85vh] min-h-[580px] relative">
+                <button id="close-setup" class="absolute right-6 top-6 text-slate-400 hover:text-slate-900 transition-colors p-2 hover:bg-slate-50 rounded-full hidden">
                     <i class="bi bi-x-lg text-xl"></i>
                 </button>
-                <div class="flex gap-2 mb-10 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 w-fit">
-                    <button type="button" onclick="switchTab('general')" id="tab-btn-general" class="tab-btn active px-8 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all">Geral</button>
-                    <button type="button" onclick="switchTab('sensors')" id="tab-btn-sensors" class="tab-btn px-8 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-slate-400">Sensores</button>
+
+                <!-- Tabs Navigation -->
+                <div class="flex gap-2 mb-8 bg-slate-50 p-1.5 rounded-2xl border border-slate-100 w-fit">
+                    <button type="button" onclick="switchTab('general')" id="tab-btn-general" class="tab-btn active px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all">
+                        <i class="bi bi-gear-wide-connected mr-2"></i>Geral
+                    </button>
+                    <button type="button" onclick="switchTab('sensors')" id="tab-btn-sensors" class="tab-btn px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-slate-400 hover:text-slate-600">
+                        <i class="bi bi-cpu-fill mr-2"></i>Sensores
+                    </button>
+                    <button type="button" onclick="switchTab('debug')" id="tab-btn-debug" class="tab-btn px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-slate-400 hover:text-slate-600">
+                        <i class="bi bi-bug mr-2"></i>Debug
+                    </button>
                 </div>
 
-                <form id="setup-form" class="space-y-10">
-                    <div id="setup-error" class="hidden bg-red-50 border border-red-100 text-red-600 p-5 rounded-2xl text-sm flex items-center gap-4 font-bold shadow-sm">
-                        <i class="bi bi-exclamation-octagon-fill text-lg"></i>
+                <style>
+                    .tab-btn.active { @apply bg-white shadow-sm text-blue-600 border border-slate-200; }
+                </style>
+
+                <form id="setup-form" class="space-y-8">
+                    <div id="setup-error" class="hidden bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl text-sm flex items-center gap-3 font-semibold">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
                         <span id="setup-error-text"></span>
                     </div>
 
-                    <div id="tab-content-general" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-10">
-                        <div class="space-y-8">
-                            <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em] flex items-center gap-3">Conexão Serial</h3>
-                            <div class="space-y-5">
+                    <!-- ABA GERAL -->
+                    <div id="tab-content-general" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
+                        
+                        <!-- Coluna 1: Hardware -->
+                        <div class="space-y-6">
+                            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <i class="bi bi-cpu"></i> Hardware & Conexão
+                            </h3>
+                            
+                            <div class="space-y-4">
                                 <div>
-                                    <label class="block text-[13px] font-bold text-slate-700 mb-2">Caminho da Porta</label>
-                                    <input type="text" name="port" value="{{ config.hardware.port }}" required class="w-full px-5 py-3 text-sm border-2 border-slate-100 rounded-2xl focus:border-blue-500 outline-none transition-all bg-slate-50 font-mono font-bold text-blue-600">
+                                    <label class="block text-[13px] font-bold text-slate-700 mb-1.5 ml-1">Porta Serial</label>
+                                    <input type="text" name="port" value="{{ config.hardware.port }}"
+                                           class="w-full px-4 py-2.5 text-sm border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none transition-all bg-slate-50 font-mono font-bold text-blue-600">
                                 </div>
-                                <div class="grid grid-cols-2 gap-5">
+
+                                <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-[13px] font-bold text-slate-700 mb-2">MCU</label>
-                                        <select name="mcu" id="setup-mcu" class="w-full px-4 py-3 text-sm border-2 border-slate-100 rounded-2xl focus:border-blue-500 outline-none bg-slate-50 font-bold">
+                                        <label class="block text-[13px] font-bold text-slate-700 mb-1.5 ml-1">MCU</label>
+                                        <select name="mcu" id="setup-mcu" class="w-full px-3 py-2.5 text-sm border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none transition-all bg-slate-50 font-semibold cursor-pointer">
                                             <option value="esp32" {% if config.hardware.mcu == 'esp32' %}selected{% endif %}>ESP32</option>
-                                            <option value="arduino_uno" {% if config.hardware.mcu == 'arduino_uno' %}selected{% endif %}>Arduino Uno</option>
+                                            <option value="arduino_uno" {% if config.hardware.mcu == 'arduino_uno' %}selected{% endif %}>Uno</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-[13px] font-bold text-slate-700 mb-2">Baudrate</label>
-                                        <input type="number" name="baudrate" value="{{ config.hardware.baudrate }}" class="w-full px-4 py-3 text-sm border-2 border-slate-100 rounded-2xl focus:border-blue-500 outline-none bg-slate-50 font-bold">
+                                        <label class="block text-[13px] font-bold text-slate-700 mb-1.5 ml-1">Baudrate</label>
+                                        <input type="number" name="baudrate" value="{{ config.hardware.baudrate }}" class="w-full px-3 py-2.5 text-sm border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50">
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Coluna 2: Amostragem & Interface -->
                         <div class="space-y-8">
-                            <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em] flex items-center gap-3">Amostragem</h3>
-                            <div class="space-y-5">
-                                <div class="p-4 bg-slate-50 rounded-[2rem] border-2 border-slate-100 transition-all focus-within:border-blue-200">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <label class="text-[13px] font-black text-slate-700">Limite Amostras</label>
-                                        <input type="checkbox" name="enable_limit_samples" id="chk-limit-samples" class="w-5 h-5" {% if config.acquisition.total_samples %}checked{% endif %}>
+                            <div class="space-y-6">
+                                <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                    <i class="bi bi-database-down"></i> Amostragem & Limites
+                                </h3>
+                                
+                                <div class="space-y-4">
+                                    <div class="p-3 bg-slate-50 rounded-2xl border-2 border-slate-100 transition-all focus-within:border-blue-200">
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <label class="text-[13px] font-bold text-slate-700">Limite de Amostras</label>
+                                            <input type="checkbox" name="enable_limit_samples" id="chk-limit-samples" 
+                                                   class="w-4 h-4 rounded-lg border-2 border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                   {% if config.acquisition.total_samples %}checked{% endif %}>
+                                        </div>
+                                        <input type="number" name="total_samples" id="input-total-samples" 
+                                               value="{{ config.acquisition.total_samples or 1000000 }}"
+                                               class="w-full px-0 py-0.5 text-sm bg-transparent outline-none font-extrabold text-blue-600 disabled:text-slate-400 disabled:cursor-not-allowed"
+                                               {% if not config.acquisition.total_samples %}disabled{% endif %}>
                                     </div>
-                                    <input type="number" name="total_samples" id="input-total-samples" value="{{ config.acquisition.total_samples or 1000000 }}" class="w-full px-0 py-1 text-lg bg-transparent outline-none font-black text-blue-600 disabled:text-slate-300" {% if not config.acquisition.total_samples %}disabled{% endif %}>
+
+                                    <div class="p-3 bg-slate-50 rounded-2xl border-2 border-slate-100 transition-all focus-within:border-indigo-200">
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <label class="text-[13px] font-bold text-slate-700">Limite de Tempo (s)</label>
+                                            <input type="checkbox" name="enable_limit_time" id="chk-limit-time"
+                                                   class="w-4 h-4 rounded-lg border-2 border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                   {% if config.acquisition.max_runtime_sec %}checked{% endif %}>
+                                        </div>
+                                        <input type="number" name="max_runtime_sec" id="input-max-runtime" 
+                                               value="{{ config.acquisition.max_runtime_sec or 1800 }}"
+                                               class="w-full px-0 py-0.5 text-sm bg-transparent outline-none font-extrabold text-indigo-600 disabled:text-slate-400 disabled:cursor-not-allowed"
+                                               {% if not config.acquisition.max_runtime_sec %}disabled{% endif %}>
+                                    </div>
                                 </div>
-                                <div class="p-4 bg-slate-50 rounded-[2rem] border-2 border-slate-100 transition-all focus-within:border-indigo-200">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <label class="text-[13px] font-black text-slate-700">Limite Tempo (s)</label>
-                                        <input type="checkbox" name="enable_limit_time" id="chk-limit-time" class="w-5 h-5" {% if config.acquisition.max_runtime_sec %}checked{% endif %}>
+                            </div>
+
+                            <div class="space-y-6 pt-2">
+                                <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                    <i class="bi bi-palette"></i> Apresentação
+                                </h3>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-[13px] font-bold text-slate-700 mb-1.5 ml-1">Update (ms)</label>
+                                        <input type="number" name="update_interval_ms" value="{{ config.presentation.update_interval_ms }}"
+                                               class="w-full px-4 py-2.5 text-sm border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50">
                                     </div>
-                                    <input type="number" name="max_runtime_sec" id="input-max-runtime" value="{{ config.acquisition.max_runtime_sec or 1800 }}" class="w-full px-0 py-1 text-lg bg-transparent outline-none font-black text-indigo-600 disabled:text-slate-300" {% if not config.acquisition.max_runtime_sec %}disabled{% endif %}>
+                                    <div>
+                                        <label class="block text-[13px] font-bold text-slate-700 mb-1.5 ml-1">Decimais</label>
+                                        <input type="number" name="decimal_places" value="{{ config.presentation.decimal_places }}" min="0" max="4"
+                                               class="w-full px-4 py-2.5 text-sm border-2 border-slate-50 rounded-xl focus:border-blue-500 outline-none bg-slate-50">
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div id="tab-content-sensors" class="tab-content hidden space-y-8">
-                        <div class="flex items-center justify-between">
-                            <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em]">Sensores Ativos</h3>
-                            <button type="button" onclick="addSensor()" class="bg-blue-600 text-white text-[10px] font-black px-5 py-2.5 rounded-xl uppercase hover:bg-blue-700">Adicionar Sensor</button>
+                    <!-- ABA SENSORES -->
+                    <div id="tab-content-sensors" class="tab-content hidden space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <i class="bi bi-cpu-fill"></i> Dispositivos & Calibração
+                            </h3>
+                            <button type="button" onclick="addSensor()" class="text-[10px] font-black bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-full transition-all flex items-center gap-2 shadow-lg shadow-blue-100 active:scale-95">
+                                <i class="bi bi-plus-lg"></i> NOVO SENSOR
+                            </button>
                         </div>
-                        <div id="sensors-list" class="space-y-6"></div>
+
+                        <div id="sensors-list" class="space-y-4">
+                            <!-- Inicia vazio. Sensores são adicionados dinamicamente via JS -->
+                        </div>
                     </div>
 
-                    <div class="pt-10 border-t border-slate-100 flex justify-end">
-                        <button type="submit" class="bg-slate-900 hover:bg-black text-white font-black py-4 px-12 rounded-2xl transition-all shadow-2xl active:scale-95 text-sm tracking-widest uppercase">Aplicar Ajustes</button>
+                    <!-- ABA DEBUG -->
+                    <div id="tab-content-debug" class="tab-content hidden space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
+                        <div class="space-y-6">
+                            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <i class="bi bi-terminal-fill"></i> Modo Avançado & Diagnóstico
+                            </h3>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="p-5 bg-amber-50 rounded-2xl border-2 border-amber-100">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div>
+                                            <h4 class="text-sm font-bold text-amber-900">Modo Debug</h4>
+                                            <p class="text-[10px] text-amber-700 font-medium leading-tight">Ativa logs detalhados e alertas do sistema.</p>
+                                        </div>
+                                        <input type="checkbox" name="debug_mode" class="w-5 h-5 rounded-lg text-amber-600 focus:ring-amber-500"
+                                               {% if config.presentation.debug_mode %}checked{% endif %}>
+                                    </div>
+                                </div>
+
+                                <div class="p-5 bg-slate-50 rounded-2xl border-2 border-slate-100">
+                                    <label class="block text-[13px] font-bold text-slate-700 mb-2 ml-1">Nível de Log (Backend)</label>
+                                    <select name="log_level" class="w-full px-3 py-2 text-sm border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none bg-white font-semibold cursor-pointer">
+                                        <option value="INFO" {% if config.presentation.log_level == 'INFO' %}selected{% endif %}>INFO (Padrão)</option>
+                                        <option value="DEBUG" {% if config.presentation.log_level == 'DEBUG' %}selected{% endif %}>DEBUG (Verboso)</option>
+                                        <option value="WARNING" {% if config.presentation.log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
+                                        <option value="ERROR" {% if config.presentation.log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="p-5 bg-blue-50 rounded-2xl border-2 border-blue-100 flex items-start gap-4">
+                                <i class="bi bi-info-square-fill text-blue-500 text-lg"></i>
+                                <div>
+                                    <h4 class="text-sm font-bold text-blue-900 mb-1">Dica de Performance</h4>
+                                    <p class="text-[11px] text-blue-700 leading-snug">O modo DEBUG e intervalos de atualização abaixo de 500ms podem impactar o desempenho do navegador em sessões com milhões de amostras.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-6 border-t border-slate-100 flex items-center justify-end">
+                        <button type="submit" id="setup-submit"
+                                class="w-full md:w-auto bg-slate-900 hover:bg-black text-white font-black py-3 px-10 rounded-2xl transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3 group">
+                            <span class="text-sm">SALVAR AJUSTES</span>
+                            <i class="bi bi-arrow-right-circle text-lg group-hover:translate-x-1 transition-transform"></i>
+                        </button>
                     </div>
                 </form>
             </div>
@@ -245,70 +342,249 @@
     <script>
         let chartInstances = {};
         let residualChartInstance = null;
-        const sensorCategories = {{ sensor_categories | tojson }};
+        let pollingIntervalId = null;
 
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
-            const colors = { success: 'bg-slate-900 border-blue-500/50', error: 'bg-red-600 border-red-400/50' };
-            toast.className = `${colors[type] || colors.success} text-white px-8 py-5 rounded-[2rem] shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-full duration-500 font-black text-xs border-2`;
-            toast.innerHTML = `<span>${message}</span>`;
+            const bg = type === 'success' ? 'bg-slate-900' : 'bg-red-600';
+            const icon = type === 'success' ? 'bi-check-circle-fill text-green-400' : 'bi-exclamation-octagon-fill text-white';
+            
+            toast.className = `${bg} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right-full duration-300 font-bold text-xs border border-white/10`;
+            toast.innerHTML = `<i class="bi ${icon} text-base"></i> <span>${message}</span>`;
+            
             container.appendChild(toast);
-            setTimeout(() => { toast.classList.add('animate-out', 'fade-out', 'slide-out-to-right-full'); setTimeout(() => toast.remove(), 500); }, 4000);
+            setTimeout(() => {
+                toast.classList.add('animate-out', 'fade-out', 'slide-out-to-right-full');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
         }
 
         function switchTab(tab) {
+            // Esconde todos os conteúdos
             document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            // Remove active de todos os botões
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('active', 'text-blue-600', 'bg-white', 'shadow-sm', 'border-slate-200');
+                b.classList.add('text-slate-400');
+            });
+
+            // Mostra o selecionado
             document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
-            document.getElementById(`tab-btn-${tab}`).classList.add('active');
-        }
-
-        function addSensor(data = null) {
-            const list = document.getElementById('sensors-list');
-            const sensorId = Date.now() + Math.random();
-            const categories = Object.keys(sensorCategories);
-            const type = data ? data.type : categories[0];
-            const models = sensorCategories[type] || [];
-            const html = `
-            <div id="sensor-${sensorId}" class="sensor-card bg-slate-50 p-8 rounded-[2.5rem] border-2 border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-6 items-end relative group transition-all hover:bg-white hover:shadow-2xl">
-                <button type="button" onclick="document.getElementById('sensor-${sensorId}').remove()" class="absolute -top-3 -right-3 bg-red-500 text-white p-2 rounded-full border-4 border-white opacity-0 group-hover:opacity-100 transition-all"><i class="bi bi-trash3-fill p-1"></i></button>
-                <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Nome</label><input type="text" name="sensor_name" value="${data ? data.name : ''}" required class="w-full px-5 py-3 text-sm border-2 rounded-2xl outline-none font-black text-slate-700"></div>
-                <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Tipo</label><select name="sensor_type" onchange="updateModelsForSensor('${sensorId}', this.value)" class="w-full px-4 py-3 text-sm border-2 rounded-2xl font-bold cursor-pointer">${categories.map(c => `<option value="${c}" ${data && data.type === c ? 'selected' : ''}>${c.toUpperCase()}</option>`).join('')}</select></div>
-                <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Modelo</label><select name="sensor_model" id="model-${sensorId}" class="w-full px-4 py-3 text-sm border-2 rounded-2xl font-bold cursor-pointer">${models.map(m => `<option value="${m}" ${data && data.model === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2">V-Ref</label><input type="number" step="0.01" name="v_ref" value="${data ? data.calibration.v_ref : '3.3'}" class="sensor-vref-field w-full px-4 py-3 text-sm border-2 rounded-2xl font-mono font-bold text-indigo-600"></div>
-                    <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2">ADC Max</label><input type="number" name="adc_max" value="${data ? data.calibration.adc_max : '4095'}" class="sensor-adc-field w-full px-4 py-3 text-sm border-2 rounded-2xl font-mono font-bold text-indigo-600"></div>
-                </div>
-            </div>`;
-            list.insertAdjacentHTML('beforeend', html);
-        }
-
-        function updateModelsForSensor(sensorId, type) {
-            const models = sensorCategories[type] || [];
-            document.getElementById(`model-${sensorId}`).innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+            const activeBtn = document.getElementById(`tab-btn-${tab}`);
+            activeBtn.classList.add('active', 'text-blue-600', 'bg-white', 'shadow-sm', 'border-slate-200');
+            activeBtn.classList.remove('text-slate-400');
         }
 
         async function openResidualAnalysis() {
             const select = document.getElementById('residual-sensor-select');
             const sensorName = select ? select.value : '';
-            document.getElementById('residual-overlay').classList.remove('hidden');
+            const overlay = document.getElementById('residual-overlay');
+            overlay.classList.remove('hidden');
+            
             try {
                 const res = await fetch(`/api/residual-analysis?sensor=${encodeURIComponent(sensorName)}`);
                 const data = await res.json();
-                if (data.error) { showToast(data.error, 'error'); return; }
+                
+                if (data.error) {
+                    showToast(data.error, 'error');
+                    overlay.classList.add('hidden');
+                    return;
+                }
+
+                // Atualiza Cards
                 document.getElementById('residual-mean').innerText = data.stats.mean.toFixed(6);
                 document.getElementById('residual-std').innerText = data.stats.std.toFixed(6);
                 document.getElementById('residual-n').innerText = data.stats.n;
+
+                // Renderiza Gráfico
                 const ctx = document.getElementById('residualChart').getContext('2d');
                 if (residualChartInstance) {
                     residualChartInstance.data.labels = data.labels;
                     residualChartInstance.data.datasets[0].data = data.values;
                     residualChartInstance.update();
                 } else {
-                    residualChartInstance = new Chart(ctx, { type: 'bar', data: { labels: data.labels, datasets: [{ label: 'Ruído', data: data.values, backgroundColor: 'rgba(99, 102, 241, 0.7)', borderRadius: 12 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+                    residualChartInstance = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label: 'Frequência de Ruído',
+                                data: data.values,
+                                backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                                borderRadius: 12
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                                x: { grid: { display: false } }
+                            }
+                        }
+                    });
                 }
-            } catch (e) { showToast("Erro na análise residual", 'error'); }
+            } catch (e) {
+                showToast("Erro ao realizar análise.", 'error');
+                overlay.classList.add('hidden');
+            }
+        }
+
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+                const overlay = document.getElementById('setup-overlay');
+                const closeBtn = document.getElementById('close-setup');
+                const errBox = document.getElementById('setup-error');
+                const errText = document.getElementById('setup-error-text');
+
+                if (!status.connected) {
+                    overlay.classList.remove('hidden');
+                    closeBtn.classList.add('hidden');
+                    if (status.error) {
+                        errText.innerText = status.error;
+                        errBox.classList.remove('hidden');
+                    }
+                } else {
+                    overlay.classList.add('hidden');
+                    closeBtn.classList.remove('hidden');
+                    startPolling();
+                }
+            } catch (err) {
+                document.getElementById('setup-overlay').classList.remove('hidden');
+            }
+        }
+
+        function startPolling() {
+            if (pollingIntervalId) clearInterval(pollingIntervalId);
+            pollingIntervalId = setInterval(() => {
+                $cruLoadContainer(document.getElementById('dashboard-trigger'));
+            }, {{ config.presentation.update_interval_ms or 1000 }});
+            $cruLoadContainer(document.getElementById('dashboard-trigger'));
+        }
+
+        const SENSOR_CATEGORIES = {{ sensor_categories | tojson }};
+
+        function addSensor(data = null) {
+            const list = document.getElementById('sensors-list');
+            const mcu = document.getElementById('setup-mcu').value;
+            const presets = { 'arduino_uno': { vref: 1.1, adc: 1023 }, 'esp32': { vref: 3.3, adc: 4095 } };
+            const p = presets[mcu] || presets['esp32'];
+
+            const sensorName = data ? data.name : "";
+            const sensorType = data ? data.type : "";
+            const sensorModel = data ? data.model : "";
+            
+            const adcx = data ? data.calibration.adc_max : p.adc;
+            const vref = data ? data.calibration.v_ref : p.vref;
+            const offset = (data && data.calibration.offset) ? data.calibration.offset : 22.6;
+            const sens = (data && data.calibration.sensitivity) ? data.calibration.sensitivity : 1.6949;
+
+            const html = `
+            <div class="sensor-card bg-slate-50 p-6 rounded-2xl border-2 border-slate-100 relative group transition-all hover:border-blue-100 animate-in fade-in slide-in-from-top-2">
+                <button type="button" onclick="this.closest('.sensor-card').remove()" class="absolute -top-2 -right-2 bg-white text-red-500 w-8 h-8 rounded-full border border-red-100 shadow-sm flex items-center justify-center hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
+                    <i class="bi bi-trash3-fill text-xs"></i>
+                </button>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Tipo de Medida</label>
+                            <select name="sensor_category" onchange="updateHardwareOptions(this)" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold cursor-pointer">
+                                <option value="" disabled ${!sensorType ? 'selected' : ''}>Selecione...</option>
+                                ${Object.keys(SENSOR_CATEGORIES).map(cat => `<option value="${cat}" ${sensorType === cat ? 'selected' : ''}>${cat}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Identificador Único</label>
+                            <input type="text" name="sensor_name" placeholder="Ex: Sensor Tanque A" value="${sensorName}" 
+                                   class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold">
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Modelo de Hardware</label>
+                            <select name="sensor_model" 
+                                    onchange="toggleCalibrationFields(this)" 
+                                    class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-semibold cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
+                                    ${!sensorType ? 'disabled' : ''}>
+                                <option value="" disabled ${!sensorModel ? 'selected' : ''}>Selecione o Hardware</option>
+                                ${sensorType ? SENSOR_CATEGORIES[sensorType].map(h => `<option value="${h}" ${sensorModel === h ? 'selected' : ''}>${h}</option>`).join('') : ''}
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3.5 calibration-core ${!sensorModel ? 'opacity-30 pointer-events-none' : ''}">
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 ml-1">ADC Max</label>
+                                <input type="number" name="sensor_adc_max" value="${adcx}" class="w-full px-2.5 py-2.5 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold sensor-adc-field">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 ml-1">V_Ref (V)</label>
+                                <input type="number" step="0.01" name="sensor_v_ref" value="${vref}" class="w-full px-2.5 py-2.5 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold sensor-vref-field">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4 calibration-extra ${sensorModel !== 'MPS20N0040D' ? 'hidden' : ''}">
+                        <div>
+                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Offset (mV)</label>
+                            <input type="number" step="0.0001" name="sensor_offset" value="${offset}" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold text-amber-600">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Sensibilidade (mV/kPa)</label>
+                            <input type="number" step="0.0001" name="sensor_sensitivity" value="${sens}" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold text-amber-600">
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            list.insertAdjacentHTML('beforeend', html);
+        }
+
+        function updateHardwareOptions(categorySelect) {
+            const card = categorySelect.closest('.sensor-card');
+            const hardwareSelect = card.querySelector('[name="sensor_model"]');
+            const core = card.querySelector('.calibration-core');
+            const extra = card.querySelector('.calibration-extra');
+            const category = categorySelect.value;
+
+            hardwareSelect.innerHTML = `<option value="" disabled selected>Selecione o Hardware</option>`;
+            
+            if (category && SENSOR_CATEGORIES[category]) {
+                SENSOR_CATEGORIES[category].forEach(h => {
+                    const opt = document.createElement('option');
+                    opt.value = h;
+                    opt.textContent = h;
+                    hardwareSelect.appendChild(opt);
+                });
+                hardwareSelect.disabled = false;
+                hardwareSelect.classList.remove('bg-slate-200');
+            } else {
+                hardwareSelect.disabled = true;
+                hardwareSelect.classList.add('bg-slate-200');
+            }
+
+            core.classList.add('opacity-30', 'pointer-events-none');
+            extra.classList.add('hidden');
+        }
+
+        function toggleCalibrationFields(select) {
+            const card = select.closest('.sensor-card');
+            const core = card.querySelector('.calibration-core');
+            const extra = card.querySelector('.calibration-extra');
+            
+            if (select.value) {
+                core.classList.remove('opacity-30', 'pointer-events-none');
+            } else {
+                core.classList.add('opacity-30', 'pointer-events-none');
+            }
+
+            if (select.value === 'MPS20N0040D') {
+                extra.classList.remove('hidden');
+            } else {
+                extra.classList.add('hidden');
+            }
         }
 
         $cruConfig({
@@ -348,48 +624,176 @@
         });
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Inicializa sensores existentes
-            const existing = {{ config.sensors | tojson }};
-            if (existing) existing.forEach(s => addSensor(s));
+            checkStatus();
 
-            // Toggles de limite
+            const existingSensors = {{ config.sensors | tojson }};
+            if (existingSensors && existingSensors.length > 0) {
+                existingSensors.forEach(s => addSensor(s));
+            }
+
+            const presets = { 'arduino_uno': { vref: 1.1, adc: 1023 }, 'esp32': { vref: 3.3, adc: 4095 } };
+
             const setupLimitToggle = (chkId, inputId) => {
                 const chk = document.getElementById(chkId);
                 const input = document.getElementById(inputId);
-                if (chk && input) chk.addEventListener('change', () => { input.disabled = !chk.checked; if (chk.checked) input.focus(); });
+                if (chk && input) {
+                    chk.addEventListener('change', () => {
+                        input.disabled = !chk.checked;
+                        if (chk.checked) input.focus();
+                    });
+                }
             };
+
             setupLimitToggle('chk-limit-samples', 'input-total-samples');
             setupLimitToggle('chk-limit-time', 'input-max-runtime');
 
-            // Form Submit
-            document.getElementById('setup-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const sensorCards = document.querySelectorAll('.sensor-card');
-                if (sensorCards.length === 0) { showToast("Adicione um sensor.", 'error'); return; }
-                const sensors = Array.from(sensorCards).map(card => ({
-                    name: card.querySelector('[name="sensor_name"]').value,
-                    type: card.querySelector('[name="sensor_type"]').value,
-                    model: card.querySelector('[name="sensor_model"]').value,
-                    calibration: { v_ref: parseFloat(card.querySelector('[name="v_ref"]').value), adc_max: parseInt(card.querySelector('[name="adc_max"]').value) }
-                }));
-                const formData = new FormData(e.target);
-                const payload = { port: formData.get('port'), mcu: formData.get('mcu'), baudrate: formData.get('baudrate'), enable_limit_samples: formData.get('enable_limit_samples')==='on', total_samples: formData.get('total_samples'), enable_limit_time: formData.get('enable_limit_time')==='on', max_runtime_sec: formData.get('max_runtime_sec'), sensors: sensors };
-                const res = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if ((await res.json()).success) { showToast("Aplicado!"); window.location.reload(); }
+            document.getElementById('setup-mcu').addEventListener('change', (e) => {
+                const p = presets[e.target.value];
+                if (p) {
+                    document.querySelectorAll('.sensor-adc-field').forEach(f => f.value = p.adc);
+                    document.querySelectorAll('.sensor-vref-field').forEach(f => f.value = p.vref);
+                    showToast(`Presets para ${e.target.value.toUpperCase()} aplicados.`);
+                }
             });
 
-            // Handlers de botões
-            document.getElementById('export-btn').addEventListener('click', async () => { const res = await fetch('/api/export', {method:'POST'}); const r = await res.json(); if(r.success) showToast(r.message); else showToast(r.error, 'error'); });
-            document.getElementById('stop-acquisition-btn').addEventListener('click', async () => { await fetch('/api/stop', {method:'POST'}); showToast("Parado!"); });
-            document.getElementById('restart-hardware-btn').addEventListener('click', async () => { if(confirm("Reiniciar?")) { await fetch('/api/restart', {method:'POST'}); window.location.reload(); }});
+            document.getElementById('setup-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const errBox = document.getElementById('setup-error');
+                const errText = document.getElementById('setup-error-text');
+                const sensorCards = document.querySelectorAll('.sensor-card');
+
+                if (sensorCards.length === 0) {
+                    errText.innerText = "É necessário adicionar pelo menos um sensor para iniciar a monitoração.";
+                    errBox.classList.remove('hidden');
+                    switchTab('sensors');
+                    return;
+                }
+
+                const formData = new FormData(e.target);
+                const payload = {
+                    port: formData.get('port'),
+                    mcu: formData.get('mcu'),
+                    baudrate: formData.get('baudrate'),
+                    enable_limit_samples: formData.get('enable_limit_samples') === 'on',
+                    total_samples: formData.get('total_samples'),
+                    enable_limit_time: formData.get('enable_limit_time') === 'on',
+                    max_runtime_sec: formData.get('max_runtime_sec'),
+                    update_interval_ms: formData.get('update_interval_ms'),
+                    decimal_places: formData.get('decimal_places'),
+                    debug_mode: formData.get('debug_mode') === 'on',
+                    log_level: formData.get('log_level'),
+                    sensors: []
+                };
+
+                let incomplete = false;
+                sensorCards.forEach(card => {
+                    const name = card.querySelector('[name="sensor_name"]').value.trim();
+                    const type = card.querySelector('[name="sensor_category"]').value;
+                    const model = card.querySelector('[name="sensor_model"]').value;
+
+                    if (!name || !type || !model) {
+                        incomplete = true;
+                        card.classList.add('border-red-400', 'bg-red-50');
+                    } else {
+                        card.classList.remove('border-red-400', 'bg-red-50');
+                    }
+
+                    const sensor = {
+                        name: name,
+                        type: type,
+                        model: model,
+                        calibration: {
+                            adc_max: parseInt(card.querySelector('[name="sensor_adc_max"]').value),
+                            v_ref: parseFloat(card.querySelector('[name="sensor_v_ref"]').value)
+                        }
+                    };
+
+                    if (sensor.model === 'MPS20N0040D') {
+                        sensor.calibration.offset = parseFloat(card.querySelector('[name="sensor_offset"]').value);
+                        sensor.calibration.sensitivity = parseFloat(card.querySelector('[name="sensor_sensitivity"]').value);
+                    }
+                    payload.sensors.push(sensor);
+                });
+
+                if (incomplete) {
+                    errText.innerText = "Por favor, preencha Identificador, Tipo e Hardware de todos os sensores.";
+                    errBox.classList.remove('hidden');
+                    switchTab('sensors');
+                    return;
+                }
+
+                errBox.classList.add('hidden');
+                
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await res.json();
+                if (result.success) {
+                    showToast("Configurações salvas!");
+                    setTimeout(() => window.location.reload(), 500);
+                } else {
+                    errText.innerText = result.error || "Erro ao salvar configuração.";
+                    errBox.classList.remove('hidden');
+                }
+            });
+
+            document.getElementById('export-btn').addEventListener('click', async () => {
+                const btn = document.getElementById('export-btn');
+                btn.disabled = true;
+                try {
+                    const res = await fetch('/api/export', { method: 'POST' });
+                    const result = await res.json();
+                    if (result.success) {
+                        showToast("Exportação concluída!");
+                    } else {
+                        showToast(result.error, 'error');
+                    }
+                } catch (e) { showToast("Erro de comunicação.", 'error'); }
+                btn.disabled = false;
+            });
+
+            document.getElementById('stop-acquisition-btn').addEventListener('click', async () => {
+                try {
+                    const res = await fetch('/api/stop', { method: 'POST' });
+                    const result = await res.json();
+                    if (result.success) {
+                        showToast("Aquisição interrompida.");
+                    } else {
+                        showToast(result.error, 'error');
+                    }
+                } catch (e) { showToast("Erro de comunicação.", 'error'); }
+            });
+
+            document.getElementById('restart-hardware-btn').addEventListener('click', async () => {
+                if (!confirm("Isso irá apagar todos os dados e reiniciar a conexão. Continuar?")) return;
+                await fetch('/api/restart', { method: 'POST' });
+                window.location.reload();
+            });
+
             document.getElementById('open-setup').addEventListener('click', () => document.getElementById('setup-overlay').classList.remove('hidden'));
             document.getElementById('close-setup').addEventListener('click', () => document.getElementById('setup-overlay').classList.add('hidden'));
+            
             document.getElementById('residual-btn').addEventListener('click', openResidualAnalysis);
-            const rs = document.getElementById('residual-sensor-select'); if(rs) rs.addEventListener('change', openResidualAnalysis);
+            const rs = document.getElementById('residual-sensor-select');
+            if (rs) rs.addEventListener('change', openResidualAnalysis);
 
-            // Polling
-            setInterval(() => $cruLoadContainer(document.getElementById('dashboard-trigger')), {{ config.presentation.update_interval_ms or 1000 }});
-            $cruLoadContainer(document.getElementById('dashboard-trigger'));
+            document.addEventListener('keydown', (e) => {
+                const setupOverlay = document.getElementById('setup-overlay');
+                const residualOverlay = document.getElementById('residual-overlay');
+                if (e.key === 'Escape') {
+                    if (!setupOverlay.classList.contains('hidden')) {
+                        const closeBtn = document.getElementById('close-setup');
+                        if (!closeBtn.classList.contains('hidden')) setupOverlay.classList.add('hidden');
+                    }
+                    if (!residualOverlay.classList.contains('hidden')) {
+                        residualOverlay.classList.add('hidden');
+                    }
+                }
+            });
         });
     </script>
 </body>
