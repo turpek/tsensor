@@ -21,7 +21,7 @@ def get_sensor_models() -> dict:
 # Template padrão para inicialização do sistema
 DEFAULT_CONFIG = {
     "hardware": {
-        "port": "/dev/ttyUSB0",
+        "port": "/dev/ttyACM0",
         "baudrate": 115200,
         "timeout": 1.0,
         "mcu": "esp32",

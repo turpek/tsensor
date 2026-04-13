@@ -5,7 +5,7 @@ from tsensor.extensions import app_status
 
 
 def serial_reading(
-    port: str, baudrate: int, samples: int, stream_manager: StreamManager, timeout: int = 1
+    port: str, baudrate: int, stream_manager: StreamManager, timeout: float = 1.0
 ) -> None:
     try:
         ser = Serial(port, baudrate, timeout=timeout)

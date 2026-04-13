@@ -29,7 +29,6 @@ def test_serial_reading_calls_dispatch_until_inactive(mocker):
     serial_reading(
         port="/dev/ttyUSB0",
         baudrate=115200,
-        samples=10,
         stream_manager=mock_manager,
         timeout=1,
     )
@@ -57,7 +56,7 @@ def test_serial_reading_handles_decoding_errors(mocker):
     )
     mock_manager.count_samples = [1]
 
-    serial_reading("COM1", 9600, 1, mock_manager)
+    serial_reading("COM1", 9600, mock_manager)
 
     # O caractere \xff deve ser ignorado conforme errors='ignore' no decode
     mock_manager.dispatch.assert_called_once_with("T=1024")

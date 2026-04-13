@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 from tsensor.extensions import setup_manager, manager
 
+
 def test_setup_manager_adds_multiple_handlers_correctly(mocker):
     """
     Valida se o setup_manager cria e adiciona múltiplos handlers ao manager
@@ -13,7 +14,7 @@ def test_setup_manager_adds_multiple_handlers_correctly(mocker):
         "LM35": mock_handler_cls,
         "NTC": mock_handler_cls
     })
-    
+
     # 2. Mock do load_config não é necessário pois passamos o config via parâmetro
     test_config = {
         "acquisition": {
@@ -45,14 +46,16 @@ def test_setup_manager_adds_multiple_handlers_correctly(mocker):
     assert len(result_manager) == 2
     assert result_manager.get_handler("Ambiente") is not None
     assert result_manager.get_handler("Motor") is not None
-    
+
     # Verifica se as classes de handler foram instanciadas 2 vezes
     assert mock_handler_cls.call_count == 2
 
+
 def test_setup_manager_raises_error_with_no_valid_sensors(mocker):
     """Garante que um erro é lançado se nenhum sensor válido for encontrado."""
-    mocker.patch("tsensor.extensions.HANDLERS", {}) # Nenhum handler disponível
-    
+    mocker.patch("tsensor.extensions.HANDLERS",
+                 {})  # Nenhum handler disponível
+
     test_config = {
         "acquisition": {},
         "sensors": [{"name": "Erro", "type": "temp", "model": "INVALIDO"}]

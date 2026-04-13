@@ -19,7 +19,7 @@ def test_api_status_returns_connection_state(client, mocker):
     """Verifica se a rota /api/status retorna o estado global da aplicação."""
     mock_status = {
         "connected": True,
-        "port": "/dev/ttyUSB0",
+        "port": "/dev/ttyACM0",
         "mcu": "esp32",
         "error": None,
     }
@@ -261,15 +261,15 @@ def test_api_update_config_advanced_and_debug(client, mocker):
 def test_api_config_rejects_empty_sensors_list(client, mocker):
     """Valida que a API rejeita um payload onde a lista de sensores está vazia."""
     mocker.patch("tsensor.routes.api.save_config")
-    
+
     payload = {
-        "port": "/dev/ttyUSB0",
+        "port": "/dev/ttyACM0",
         "mcu": "esp32",
         "baudrate": 115200,
         "sensors": []
     }
 
     response = client.post("/api/config", json=payload)
-    
+
     assert response.status_code == 400
     assert "pelo menos um sensor" in response.get_json()["error"]

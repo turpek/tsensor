@@ -19,7 +19,8 @@ def test_load_config_applies_mcu_presets_from_file(mocker):
         "toml.load", return_value={
             "hardware": {"mcu": "arduino_uno"},
             "sensors": [
-                {"name": "s1", "type": "temperature", "model": "LM35"} # Sem calibração
+                {"name": "s1", "type": "temperature",
+                    "model": "LM35"}  # Sem calibração
             ]
         }
     )
