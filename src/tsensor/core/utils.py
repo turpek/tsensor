@@ -115,14 +115,41 @@ def detrend(samples: list[float]) -> list[float]:
 
 
 def numpy_histogram(samples: np.ndarray, decimals: int = 4) -> dict[str, int]:
-    """Wrapper para o histograma do NumPy com binning automático."""
+    """Wrapper para o histograma do NumPy com binning automático limitado a 15."""
     if samples.size == 0:
         return {}
 
-    counts, bin_edges = np.histogram(samples, bins="auto")
+    # Calcula bins automáticos e limita a no máximo 15
+    edges = np.histogram_bin_edges(samples, bins="auto")
+    k = min(len(edges) - 1, 15)
+
+    counts, bin_edges = np.histogram(samples, bins=k)
     labels = [str(round(float(x), decimals)) for x in bin_edges[:-1]]
 
     return dict(zip(labels, counts.tolist()))
+
+
+def hybrid_histogram(
+    samples: np.ndarray,
+    amplitude: float,
+    mvg_average: float,
+    resolucao_adc: float,
+    decimal_label: int = 1
+) -> dict[str, int]:
+    """Função híbrida que escolhe a melhor representação de histograma entre NumPy e Clássico."""
+    # Tenta primeiro a abordagem NumPy (mais rápida e estatística)
+    res_np = numpy_histogram(samples, decimals=decimal_label)
+
+    # Se o NumPy gerar muitos bins, tenta o algoritmo clássico (Freedman-Diaconis customizado)
+    if len(res_np) >= 10:
+        res_classic = histogram(
+            samples, amplitude, mvg_average, resolucao_adc, decimal_label
+        )
+        # Retorna o que resultar em menos bins para evitar poluição visual no dashboard
+        if len(res_classic) < len(res_np):
+            return res_classic
+
+    return res_np
 
 
 def histogram(

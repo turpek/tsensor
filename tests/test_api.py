@@ -72,7 +72,7 @@ def test_api_histogram_returns_json_with_mocked_values(client, mock_handler):
     # Adiciona dados ao stream principal
     for val in [10.0, 20.0, 30.0, 40.0, 50.0]:
         mock_handler.data.add(val, timestamp="10:00:00:000")
-    
+
     # Simula dados na série temporal (decimada)
     mock_handler.time_series.add(30.0, timestamp="10:00:05")
 
@@ -83,12 +83,12 @@ def test_api_histogram_returns_json_with_mocked_values(client, mock_handler):
 
     data = response.get_json()
     sensor_data = data["Sensor Teste"]
-    
+
     # Valida Histograma
     assert "histogram" in sensor_data
     assert "labels" in sensor_data["histogram"]
     assert sum(sensor_data["histogram"]["values"]) == 5
-    
+
     # Valida Série Temporal (Campos labels e values no topo do objeto do sensor)
     assert "labels" in sensor_data
     assert "values" in sensor_data
@@ -204,20 +204,20 @@ def test_api_export_success(client, mock_handler, mocker):
     assert response.status_code == 200
     assert response.json["success"] is True
     assert "lado a lado" in response.json["message"]
-    
+
     # Verifica o cabeçalho dinâmico (no mock_handler o tipo padrão no config mockado é omitido, cai no 'valor')
     # No mock_handler definido no topo do arquivo, o config['sensors'] tem type não definido explicitamente (cai no default 'valor')
     # Mas vamos ver o que o config mockado na fixture mock_handler tem:
     # mock_sensor_config = [{"name": "Sensor Teste", ...}] -> não tem 'type'
     expected_header = ["timestamp", "valor"]
-    
+
     mock_exporter_cls.assert_called_once_with(
         directory="exports",
         header=expected_header
     )
-    
+
     mock_exporter_inst.setup.assert_called_once()
-    
+
     # Verifica se os dados foram alinhados lado a lado
     # Como só temos 1 sensor no manager do mock, teremos [ts, val]
     expected_rows = [["10:00:01", 25.0]]
@@ -345,7 +345,7 @@ def test_api_download_charts_zip_success(client, mock_handler, mocker):
 def test_api_download_charts_zip_no_sensors(client, mocker):
     """Verifica se a rota retorna erro quando não há handlers registrados."""
     mocker.patch("tsensor.routes.api.manager", [])
-    
+
     response = client.get("/api/download-charts-zip")
     assert response.status_code == 400
     assert "Nenhum sensor configurado" in response.get_json()["error"]

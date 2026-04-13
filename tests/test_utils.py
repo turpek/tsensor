@@ -192,4 +192,51 @@ def test_residuals_with_noise():
     # Resíduos esperados: [-0.5, 0.5, 0.5, -0.5]
     samples = [10.0, 11.0, 11.0, 10.0]
     residuals = detrend(samples)
-    assert np.allclose(residuals, [-0.5, 0.5, 0.5, -0.5])
+    assert np.isclose(residuals, [-0.5, 0.5, 0.5, -0.5]).all()
+
+
+def test_numpy_histogram_empty():
+    """Deve retornar dict vazio para entrada vazia."""
+    from tsensor.core.utils import numpy_histogram
+    res = numpy_histogram(np.array([]))
+    assert res == {}
+
+
+def test_numpy_histogram_limit_bins():
+    """Deve limitar o número de bins a no máximo 15."""
+    from tsensor.core.utils import numpy_histogram
+    # 5000 amostras normalmente gerariam muito mais que 15 bins com 'auto'
+    samples = np.random.normal(loc=10, scale=1, size=5000)
+    res = numpy_histogram(samples)
+    assert len(res) <= 15
+    assert sum(res.values()) == 5000
+
+
+def test_hybrid_histogram_prefers_numpy_when_small():
+    """Deve usar NumPy se o número de bins for pequeno (<= 10)."""
+    from tsensor.core.utils import hybrid_histogram
+    # Poucos dados -> NumPy deve gerar poucos bins
+    samples = np.array([1.0, 1.1, 1.2, 1.3, 1.4])
+    res = hybrid_histogram(samples, 0.4, 1.2, 0.1)
+    # Com 5 amostras e bins='auto', NumPy provavelmente gera 2-3 bins
+    assert len(res) <= 10
+
+
+def test_hybrid_histogram_prefers_classic_when_numpy_is_dense():
+    """Deve preferir o algoritmo clássico se ele resultar em menos bins que o NumPy (quando NumPy > 10)."""
+    from tsensor.core.utils import hybrid_histogram, numpy_histogram, histogram
+
+    # Gerar dados que forçam o NumPy a gerar 15 bins
+    samples = np.random.normal(loc=25, scale=5, size=5000)
+
+    res_np = numpy_histogram(samples, decimals=1)
+    res_classic = histogram(samples, 40.0, 25.0, 0.5, 1)
+
+    res_hybrid = hybrid_histogram(samples, 40.0, 25.0, 0.5, 1)
+
+    # Se ambos foram calculados e o clássico for menor, o híbrido deve ser o clássico
+    if len(res_np) >= 10 and len(res_classic) < len(res_np):
+        assert len(res_hybrid) == len(res_classic)
+    else:
+        # Caso contrário (ou se NumPy < 10), deve ser o NumPy
+        assert len(res_hybrid) == len(res_np)

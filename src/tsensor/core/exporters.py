@@ -137,7 +137,7 @@ class CSVExporter:
 
         try:
             df = pd.DataFrame(data, columns=self._header)
-            
+
             if comment:
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(f"# {comment}\n")

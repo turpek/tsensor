@@ -1,7 +1,13 @@
+from scipy.interpolate import make_interp_spline
+import matplotlib.pyplot as plt
+import matplotlib
+from datetime import datetime
+import zipfile
+import io
 import numpy as np
 from flask import Blueprint, render_template, jsonify, request
 from tsensor.extensions import manager, config, app_status
-from tsensor.core.utils import save_config, detrend, Stat, numpy_histogram
+from tsensor.core.utils import save_config, detrend, Stat, hybrid_histogram
 from tsensor.core.acquisition import start_acquisition, stop_acquisition
 from tsensor.core.exporters import CSVExporter
 
@@ -41,7 +47,9 @@ def get_residual_analysis():
     # Usa a classe Stat com inicialização atômica para estatísticas básicas
     stat = Stat(total_samples=len(res_array), initial_data=res_array)
 
-    hist_dict = numpy_histogram(res_array, decimals=6)
+    hist_dict = hybrid_histogram(
+        res_array, stat.amplitude, stat.mean, resolucao_adc=0.01, decimal_label=6
+    )
 
     return jsonify({
         "labels": list(hist_dict.keys()),
@@ -62,12 +70,12 @@ def export_data():
 
     try:
         export_dir = "exports"
-        
+
         # Coleta dados por sensor e identifica o tamanho máximo
         sensor_data = {}
         max_len = 0
         sensor_names = list(manager._handlers.keys())
-        
+
         for name in sensor_names:
             samples = manager._handlers[name].data.sample
             sensor_data[name] = samples
@@ -82,12 +90,14 @@ def export_data():
         comment_parts = []
         for name in sensor_names:
             # Pega o tipo para o cabeçalho (ex: temperature, pressure)
-            sensor_config = next((s for s in config["sensors"] if s["name"] == name), {})
+            sensor_config = next(
+                (s for s in config["sensors"] if s["name"] == name), {})
             s_type = sensor_config.get("type", "valor")
-            
+
             header.extend(["timestamp", s_type])
-            comment_parts.append(f"{name}; ") # Espaçamento para as duas colunas
-            
+            # Espaçamento para as duas colunas
+            comment_parts.append(f"{name}; ")
+
         comment_line = "; ".join(comment_parts)
 
         # Prepara as linhas alinhando as amostras
@@ -99,7 +109,8 @@ def export_data():
                 if i < len(samples):
                     row.extend([samples[i][0], samples[i][1]])
                 else:
-                    row.extend(["", ""]) # Padding para sensores com menos amostras
+                    # Padding para sensores com menos amostras
+                    row.extend(["", ""])
             rows.append(row)
 
         exporter = CSVExporter(directory=export_dir, header=header)
@@ -109,7 +120,8 @@ def export_data():
         file_name = f"sessao_paralela_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
         # Exporta com separador ';' e linha de comentário
-        success = exporter.export(rows, file_name, sep=";", comment=comment_line)
+        success = exporter.export(
+            rows, file_name, sep=";", comment=comment_line)
 
         if success:
             n = len(sensor_names)
@@ -236,10 +248,10 @@ def get_stats():
 @api_route.route("/histogram", methods=["GET"])
 def get_histogram():
     all_histograms = {}
-    
+
     for name, handler in manager._handlers.items():
         buffer = handler.data_buffer
-        
+
         # Só move para o histórico (time_series) se o buffer atingiu o limite configurado (is_full)
         if buffer.is_full:
             # Extrai o timestamp da última amostra do buffer
@@ -250,8 +262,7 @@ def get_histogram():
             buffer.clear()
 
         ds = handler.data
-        data = np.array(ds.data)
-        hist_dict = numpy_histogram(data, decimals=4)
+        hist_dict = ds.histogram(resolucao_adc=0.01, decimal_label=4)
 
         all_histograms[name] = {
             "labels": [s[0] for s in handler.time_series.sample],
@@ -272,15 +283,7 @@ def get_histogram():
     return jsonify(all_histograms)
 
 
-import io
-import zipfile
-from datetime import datetime
-import matplotlib
 matplotlib.use("Agg")  # Backend não interativo para web
-import matplotlib.pyplot as plt
-
-
-from scipy.interpolate import make_interp_spline
 
 
 @api_route.route("/download-charts-zip", methods=["GET"])
@@ -298,81 +301,96 @@ def download_charts_zip():
 
         for name, handler in manager._handlers.items():
             safe_name = name.replace(" ", "_")
-            
+
             # Busca o tipo do sensor no config para determinar a unidade
-            sensor_config = next((s for s in config["sensors"] if s["name"] == name), {})
+            sensor_config = next(
+                (s for s in config["sensors"] if s["name"] == name), {})
             s_type = sensor_config.get("type", "sensor")
             unit = units.get(s_type, "")
-            
+
             # 1. Gráfico de Série Temporal (Suavizado com Spline)
             data_points = handler.time_series.sample
             if data_points:
                 labels = [p[0] for p in data_points]
                 values = np.array([p[1] for p in data_points])
                 indices = np.arange(len(values))
-                
+
                 plt.figure(figsize=(10, 6), dpi=100)
-                
+
                 # Se houver pontos suficientes (mín 4 para cubic spline), suavizamos a linha
                 if len(values) >= 4:
-                    indices_new = np.linspace(indices.min(), indices.max(), 300)
+                    indices_new = np.linspace(
+                        indices.min(), indices.max(), 300)
                     spline = make_interp_spline(indices, values, k=3)
                     values_smooth = spline(indices_new)
-                    
+
                     # Desenha a linha suave e os pontos reais (como marcadores discretos)
-                    plt.plot(indices_new, values_smooth, color="#6366f1", linewidth=2.5, alpha=0.8, label="Tendência")
-                    plt.scatter(indices, values, color="#4f46e5", s=25, zorder=5, label="Amostras")
+                    plt.plot(indices_new, values_smooth, color="#6366f1",
+                             linewidth=2.5, alpha=0.8, label="Tendência")
+                    plt.scatter(indices, values, color="#4f46e5",
+                                s=25, zorder=5, label="Amostras")
                 else:
                     # Fallback para linha simples com marcadores
-                    plt.plot(indices, values, color="#6366f1", linewidth=2, marker="o", markersize=6)
+                    plt.plot(indices, values, color="#6366f1",
+                             linewidth=2, marker="o", markersize=6)
 
-                plt.title(f"Série Temporal: {name}", fontsize=14, fontweight="bold")
+                plt.title(f"Série Temporal: {name}",
+                          fontsize=14, fontweight="bold")
                 plt.xlabel("Tempo", fontsize=10)
                 plt.ylabel(f"Valor ({unit})" if unit else "Valor", fontsize=10)
-                
+
                 # Ajusta os ticks do eixo X (tempo) para não encavalar
                 step = max(1, len(labels) // 10)
-                plt.xticks(indices[::step], [labels[i] for i in range(0, len(labels), step)], rotation=45, fontsize=8)
-                
+                plt.xticks(indices[::step], [labels[i] for i in range(
+                    0, len(labels), step)], rotation=45, fontsize=8)
+
                 plt.grid(True, linestyle="--", alpha=0.5)
                 plt.tight_layout()
-                
+
                 img_io = io.BytesIO()
                 plt.savefig(img_io, format="png", facecolor="white")
                 plt.close()
-                zf.writestr(f"serie_temporal_{safe_name}_{timestamp}.png", img_io.getvalue())
+                zf.writestr(
+                    f"serie_temporal_{safe_name}_{timestamp}.png", img_io.getvalue())
 
             # 2. Histograma Global
             data_raw = np.array(handler.data.data)
             if len(data_raw) > 0:
                 plt.figure(figsize=(10, 6), dpi=100)
-                plt.hist(data_raw, bins="auto", color="#3b82f6", alpha=0.7, edgecolor="white")
-                plt.title(f"Distribuição de Dados: {name}", fontsize=14, fontweight="bold")
+                plt.hist(data_raw, bins="auto", color="#3b82f6",
+                         alpha=0.7, edgecolor="white")
+                plt.title(
+                    f"Distribuição de Dados: {name}", fontsize=14, fontweight="bold")
                 plt.xlabel(f"Valor ({unit})" if unit else "Valor", fontsize=10)
                 plt.ylabel("Frequência", fontsize=10)
                 plt.grid(axis="y", linestyle="--", alpha=0.7)
                 plt.tight_layout()
-                
+
                 img_io = io.BytesIO()
                 plt.savefig(img_io, format="png", facecolor="white")
                 plt.close()
-                zf.writestr(f"histograma_{safe_name}_{timestamp}.png", img_io.getvalue())
+                zf.writestr(
+                    f"histograma_{safe_name}_{timestamp}.png", img_io.getvalue())
 
             # 3. Gráfico de Resíduos (Detrended)
             if len(data_raw) > 1:
                 residuals = detrend(handler.data.data)
                 plt.figure(figsize=(10, 6), dpi=100)
-                plt.hist(residuals, bins="auto", color="#818cf8", alpha=0.7, edgecolor="white")
-                plt.title(f"Análise Residual (Ruído): {name}", fontsize=14, fontweight="bold")
-                plt.xlabel(f"Desvio ({unit})" if unit else "Desvio", fontsize=10)
+                plt.hist(residuals, bins="auto", color="#818cf8",
+                         alpha=0.7, edgecolor="white")
+                plt.title(
+                    f"Análise Residual (Ruído): {name}", fontsize=14, fontweight="bold")
+                plt.xlabel(
+                    f"Desvio ({unit})" if unit else "Desvio", fontsize=10)
                 plt.ylabel("Frequência", fontsize=10)
                 plt.grid(axis="y", linestyle="--", alpha=0.7)
                 plt.tight_layout()
-                
+
                 img_io = io.BytesIO()
                 plt.savefig(img_io, format="png", facecolor="white")
                 plt.close()
-                zf.writestr(f"residuos_{safe_name}_{timestamp}.png", img_io.getvalue())
+                zf.writestr(
+                    f"residuos_{safe_name}_{timestamp}.png", img_io.getvalue())
 
     zip_buffer.seek(0)
     from flask import send_file

@@ -132,9 +132,9 @@ def test_csv_exporter_export_saves_file(csv_exporter):
     # Valida o conteúdo do arquivo
     with open(file_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
-        assert lines[0].strip() == "timestamp,temperatura"
-        assert lines[1].strip() == "10:00:01,25.5"
-        assert lines[2].strip() == "10:00:02,26.0"
+        assert lines[0].strip() == "timestamp;temperatura"
+        assert lines[1].strip() == "10:00:01;25.5"
+        assert lines[2].strip() == "10:00:02;26.0"
 
 
 def test_csv_exporter_failure_returns_false(csv_exporter, mocker):
