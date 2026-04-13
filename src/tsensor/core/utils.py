@@ -147,7 +147,7 @@ def hybrid_histogram(
             samples, amplitude, mvg_average, resolucao_adc, decimal_label
         )
         # Retorna o que resultar em menos bins para evitar poluição visual no dashboard
-        if len(res_classic) < len(res_np):
+        if 2 < len(res_classic) < len(res_np):
             return res_classic
 
     return res_np

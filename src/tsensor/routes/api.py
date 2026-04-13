@@ -155,7 +155,8 @@ def update_config():
         data.get("baudrate", config["hardware"]["baudrate"])
     )
     if "simulation_latency_us" in data:
-        config["hardware"]["simulation_latency_us"] = int(data["simulation_latency_us"])
+        config["hardware"]["simulation_latency_us"] = int(
+            data["simulation_latency_us"])
 
     # Se sensors vier no payload, sobrescreve a lista completa
     if "sensors" in data:
