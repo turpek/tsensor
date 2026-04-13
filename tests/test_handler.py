@@ -8,16 +8,17 @@ from tsensor.core.data_stream import DataStream
 
 @pytest.fixture
 def data_streams():
-    # Agora o tamanho do buffer é definido apenas aqui, na criação do DataStream
-    return DataStream(total_samples=100), DataStream(total_samples=100)
+    # Agora retorna 3 DataStreams: global, buffer e time_series
+    return DataStream(total_samples=100), DataStream(total_samples=100), DataStream(total_samples=100)
 
 
 @pytest.fixture
 def ntc_handler(data_streams):
-    data, data_buffer = data_streams
+    data, data_buffer, time_series = data_streams
     return NTCHandler(
         data=data,
         data_buffer=data_buffer,
+        time_series=time_series,
         adc_max=4095,
         v_ref=3.3,
     )
@@ -25,10 +26,11 @@ def ntc_handler(data_streams):
 
 @pytest.fixture
 def lm35_handler(data_streams):
-    data, data_buffer = data_streams
+    data, data_buffer, time_series = data_streams
     return LM35Handler(
         data=data,
         data_buffer=data_buffer,
+        time_series=time_series,
         adc_max=1023,
         v_ref=1.1,
     )
@@ -36,10 +38,11 @@ def lm35_handler(data_streams):
 
 @pytest.fixture
 def mps20_handler(data_streams):
-    data, data_buffer = data_streams
+    data, data_buffer, time_series = data_streams
     return MPS20Handler(
         data=data,
         data_buffer=data_buffer,
+        time_series=time_series,
         adc_max=4095,
         v_ref=3.3,
         offset=22.6,
@@ -87,11 +90,11 @@ def test_stream_manager_add_and_get_handler(stream_manager, lm35_handler):
 
 
 def test_stream_manager_dispatch_to_multiple_handlers(stream_manager):
-    d1, b1 = DataStream(10), DataStream(10)
-    h1 = LM35Handler(d1, b1, 1023, 1.1)  # Sem o parâmetro samples
+    d1, b1, t1 = DataStream(10), DataStream(10), DataStream(10)
+    h1 = LM35Handler(d1, b1, t1, 1023, 1.1)
 
-    d2, b2 = DataStream(10), DataStream(10)
-    h2 = LM35Handler(d2, b2, 1023, 1.1)
+    d2, b2, t2 = DataStream(10), DataStream(10), DataStream(10)
+    h2 = LM35Handler(d2, b2, t2, 1023, 1.1)
 
     stream_manager.add_handler("s1", h1)
     stream_manager.add_handler("s2", h2)
@@ -106,8 +109,8 @@ def test_stream_manager_is_active_with_total_samples_limit():
     manager = StreamManager()
     manager.configure(timeout=10, total_samples=limit)
 
-    d, b = DataStream(10), DataStream(10)
-    h = LM35Handler(d, b, 1023, 1.1)
+    d, b, t = DataStream(10), DataStream(10), DataStream(10)
+    h = LM35Handler(d, b, t, 1023, 1.1)
     manager.add_handler("s1", h)
 
     for i in range(limit):
@@ -128,12 +131,12 @@ def test_stream_manager_is_active_based_on_max_samples_per_sensor(stream_manager
     stream_manager.configure(timeout=60, total_samples=limit)
 
     # Sensor 1
-    d1, b1 = DataStream(20), DataStream(20)
-    h1 = LM35Handler(d1, b1, 1023, 1.1)
+    d1, b1, t1 = DataStream(20), DataStream(20), DataStream(20)
+    h1 = LM35Handler(d1, b1, t1, 1023, 1.1)
 
     # Sensor 2
-    d2, b2 = DataStream(20), DataStream(20)
-    h2 = LM35Handler(d2, b2, 1023, 1.1)
+    d2, b2, t2 = DataStream(20), DataStream(20), DataStream(20)
+    h2 = LM35Handler(d2, b2, t2, 1023, 1.1)
 
     stream_manager.add_handler("s1", h1)
     stream_manager.add_handler("s2", h2)
@@ -194,6 +197,7 @@ def test_mps20_custom_calibration():
     custom_handler = MPS20Handler(
         data=DataStream(10),
         data_buffer=DataStream(10),
+        time_series=DataStream(10),
         adc_max=4095,  # Não usado na fórmula fixa de 24 bits
         v_ref=v_ref,
         offset=offset,

@@ -11,6 +11,7 @@ def mock_handler(mocker):
     handler = mocker.Mock()
     handler.data = DataStream(total_samples=100)
     handler.data_buffer = DataStream(total_samples=100)
+    handler.time_series = DataStream(total_samples=100)
 
     # Registra o handler no manager real para o loop do endpoint funcionar
     mocker.patch.dict(manager._handlers, {"Sensor Teste": handler})
@@ -78,8 +79,10 @@ def test_api_histogram_returns_json_with_mocked_values(client, mock_handler):
 
     data = response.get_json()
     assert "Sensor Teste" in data
-    assert "labels" in data["Sensor Teste"]
-    assert sum(data["Sensor Teste"]["values"]) == 5
+    assert "histogram" in data["Sensor Teste"]
+    assert "labels" in data["Sensor Teste"]["histogram"]
+    # No histograma, a soma dos valores deve ser igual ao número de amostras
+    assert sum(data["Sensor Teste"]["histogram"]["values"]) == 5
 
 
 def test_api_histogram_empty_stream(client, mock_handler):
@@ -90,7 +93,8 @@ def test_api_histogram_empty_stream(client, mock_handler):
 
     data = response.get_json()
     assert "Sensor Teste" in data
-    assert sum(data["Sensor Teste"]["values"]) == 0
+    assert "histogram" in data["Sensor Teste"]
+    assert sum(data["Sensor Teste"]["histogram"]["values"]) == 0
 
 
 def test_api_config_updates_values_and_calls_save(client, mocker):

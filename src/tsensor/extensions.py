@@ -17,6 +17,7 @@ def setup_manager(config: dict) -> StreamManager:
 
     session_limit = config["acquisition"].get("total_samples", 1000000)
     buffer_limit = config["acquisition"].get("buffer_samples", 1000)
+    timeseries_limit = config["acquisition"].get("timeseries_samples", 480)
 
     for sensor in config.get('sensors', []):
         sensor_model = sensor.get("model")
@@ -26,11 +27,12 @@ def setup_manager(config: dict) -> StreamManager:
 
         data_stream = DataStream(total_samples=session_limit)
         data_buffer = DataStream(total_samples=buffer_limit)
+        time_series = DataStream(total_samples=timeseries_limit)
 
         cls_handler = HANDLERS.get(sensor_model)
-        kwargs = sensor.get('calibration')
+        kwargs = sensor.get('calibration', {})
         name = sensor.get('name')
-        handler = cls_handler(data_stream, data_buffer, **kwargs)
+        handler = cls_handler(data_stream, data_buffer, time_series, **kwargs)
         manager.add_handler(name, handler)
 
     if len(manager) == 0:

@@ -200,14 +200,30 @@ def get_stats():
 @api_route.route("/histogram", methods=["GET"])
 def get_histogram():
     all_histograms = {}
+    
     for name, handler in manager._handlers.items():
+        buffer = handler.data_buffer
+        
+        # Só move para o histórico (time_series) se o buffer atingiu o limite configurado (is_full)
+        if buffer.is_full:
+            # Extrai o timestamp da última amostra do buffer
+            last_ts = buffer.sample[-1][0] if buffer.sample else None
+            # Adiciona a média do bloco ao histórico temporal
+            handler.time_series.add(buffer.mean, timestamp=last_ts)
+            # Limpa o buffer para o próximo bloco
+            buffer.clear()
+
         ds = handler.data
         data = np.array(ds.data)
         hist_dict = numpy_histogram(data, decimals=4)
 
         all_histograms[name] = {
-            "labels": list(hist_dict.keys()),
-            "values": list(hist_dict.values()),
+            "labels": [s[0] for s in handler.time_series.sample],
+            "values": [s[1] for s in handler.time_series.sample],
+            "histogram": {
+                "labels": list(hist_dict.keys()),
+                "values": list(hist_dict.values()),
+            },
             "stats": {
                 "n": len(ds),
                 "mean": ds.mean,

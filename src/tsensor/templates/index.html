@@ -314,13 +314,27 @@
                     <p id="max-{{ sensor.name|replace(' ', '-') }}" class="text-2xl font-black text-slate-700">-</p>
                 </div>
 
-                <div class="col-span-full mt-12 max-w-4xl mx-auto w-full">
-                    <div class="flex items-center gap-2 mb-4 ml-6">
-                        <div class="w-1.5 h-4 bg-blue-500 rounded-full"></div>
-                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Distribuição Real-Time</span>
+                <div class="col-span-full mt-12 grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto w-full">
+                    <!-- Gráfico de Série Temporal -->
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-2 ml-6">
+                            <div class="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Série Temporal (Média Polling)</span>
+                        </div>
+                        <div class="bg-slate-50/50 rounded-[2.5rem] p-8 border border-slate-100 h-[400px] transition-all hover:bg-white hover:shadow-xl">
+                            <canvas id="time-canvas-{{ sensor.name|replace(' ', '-') }}"></canvas>
+                        </div>
                     </div>
-                    <div class="bg-slate-50/50 rounded-[2.5rem] p-8 border border-slate-100 h-[400px] transition-all hover:bg-white hover:shadow-xl">
-                        <canvas id="canvas-{{ sensor.name|replace(' ', '-') }}"></canvas>
+
+                    <!-- Histograma Global -->
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-2 ml-6">
+                            <div class="w-1.5 h-4 bg-blue-500 rounded-full"></div>
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Distribuição Real-Time (Histograma)</span>
+                        </div>
+                        <div class="bg-slate-50/50 rounded-[2.5rem] p-8 border border-slate-100 h-[400px] transition-all hover:bg-white hover:shadow-xl">
+                            <canvas id="canvas-{{ sensor.name|replace(' ', '-') }}"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -340,7 +354,8 @@
 
     <script src="{{ url_for('static', filename='js/cru.js') }}"></script>
     <script>
-        let chartInstances = {};
+        let chartInstances = {}; // Histogramas
+        let timeChartInstances = {}; // Séries Temporais
         let residualChartInstance = null;
         let pollingIntervalId = null;
 
@@ -603,20 +618,71 @@
                         document.getElementById(`min-${safeName}`).innerText = data.stats.min.toFixed(2);
                         document.getElementById(`max-${safeName}`).innerText = data.stats.max.toFixed(2);
 
-                        // Atualiza Gráfico
+                        // 1. Atualiza Histograma (Bar Chart)
                         const canvasEl = document.getElementById(`canvas-${safeName}`);
-                        if (!canvasEl) continue;
-                        const ctx = canvasEl.getContext('2d');
-                        if (chartInstances[name]) {
-                            chartInstances[name].data.labels = data.labels;
-                            chartInstances[name].data.datasets[0].data = data.values;
-                            chartInstances[name].update('none');
-                        } else {
-                            chartInstances[name] = new Chart(ctx, {
-                                type: 'bar',
-                                data: { labels: data.labels, datasets: [{ data: data.values, backgroundColor: 'rgba(59, 130, 246, 0.7)', borderRadius: 12 }] },
-                                options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false }, ticks: { font: { size: 9 } } } } }
-                            });
+                        if (canvasEl && data.histogram) {
+                            const ctx = canvasEl.getContext('2d');
+                            if (chartInstances[name]) {
+                                chartInstances[name].data.labels = data.histogram.labels;
+                                chartInstances[name].data.datasets[0].data = data.histogram.values;
+                                chartInstances[name].update('none');
+                            } else {
+                                chartInstances[name] = new Chart(ctx, {
+                                    type: 'bar',
+                                    data: { labels: data.histogram.labels, datasets: [{ data: data.histogram.values, backgroundColor: 'rgba(59, 130, 246, 0.7)', borderRadius: 12 }] },
+                                    options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false }, ticks: { font: { size: 9 } } } } }
+                                });
+                            }
+                        }
+
+                        // 2. Atualiza Série Temporal (Line Chart)
+                        const timeCanvasEl = document.getElementById(`time-canvas-${safeName}`);
+                        if (timeCanvasEl) {
+                            const ctx = timeCanvasEl.getContext('2d');
+                            if (timeChartInstances[name]) {
+                                timeChartInstances[name].data.labels = data.labels;
+                                timeChartInstances[name].data.datasets[0].data = data.values;
+                                timeChartInstances[name].update('none');
+                            } else {
+                                timeChartInstances[name] = new Chart(ctx, {
+                                    type: 'line',
+                                    data: { 
+                                        labels: data.labels, 
+                                        datasets: [{ 
+                                            data: data.values, 
+                                            borderColor: '#6366f1', 
+                                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                            fill: true,
+                                            tension: 0.4,
+                                            pointRadius: 0,
+                                            borderWidth: 3
+                                        }] 
+                                    },
+                                    options: { 
+                                        responsive: true, 
+                                        maintainAspectRatio: false, 
+                                        animation: false, 
+                                        plugins: { legend: { display: false } }, 
+                                        scales: { 
+                                            y: { grid: { color: '#f1f5f9' } }, 
+                                            x: { 
+                                                display: true,
+                                                grid: { display: false },
+                                                ticks: {
+                                                    maxRotation: 0,
+                                                    autoSkip: true,
+                                                    maxTicksLimit: 5,
+                                                    font: { size: 9 },
+                                                    callback: function(val, index) {
+                                                        const label = this.getLabelForValue(val);
+                                                        return label ? label.substring(0, 8) : '';
+                                                    }
+                                                }
+                                            } 
+                                        } 
+                                    }
+                                });
+                            }
                         }
                     }
                 }

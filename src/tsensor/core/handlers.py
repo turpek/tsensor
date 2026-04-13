@@ -18,6 +18,7 @@ class SerialHandler(Protocol):
         self,
         data: DataStream,
         data_buffer: DataStream,
+        time_series: DataStream,
         adc_max: int,
         v_ref: float,
     ):
@@ -34,12 +35,17 @@ class SerialHandler(Protocol):
     def data_buffer(self) -> DataStream:
         ...
 
+    @property
+    def time_series(self) -> DataStream:
+        ...
+
 
 class PressureHandler(ABC):
     def __init__(
         self,
         data: DataStream,
         data_buffer: DataStream,
+        time_series: DataStream,
         adc_max: int,
         v_ref: float,
         offset: float = 22.6,
@@ -47,6 +53,7 @@ class PressureHandler(ABC):
     ):
         self._data = data
         self._data_buffer = data_buffer
+        self._time_series = time_series
         self._adc_max = adc_max
         self._v_ref = v_ref
         self._offset = offset
@@ -85,17 +92,23 @@ class PressureHandler(ABC):
     def data(self) -> DataStream:
         return self._data
 
+    @property
+    def time_series(self) -> DataStream:
+        return self._time_series
+
 
 class TemperatureHandler(ABC):
     def __init__(
         self,
         data: DataStream,
         data_buffer: DataStream,
+        time_series: DataStream,
         adc_max: int,
         v_ref: float,
     ):
         self._data = data
         self._data_buffer = data_buffer
+        self._time_series = time_series
         self._adc_max = adc_max
         self._v_ref = v_ref
         self._re = re.compile(f"T={REG_ADC_VALUE}")
@@ -134,6 +147,10 @@ class TemperatureHandler(ABC):
     @property
     def data(self) -> DataStream:
         return self._data
+
+    @property
+    def time_series(self) -> DataStream:
+        return self._time_series
 
 
 class NTCHandler(TemperatureHandler):
