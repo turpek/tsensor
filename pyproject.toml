@@ -17,6 +17,7 @@ dependencies = [
     "pytest",
     "pytest-mock",
     "numpy",
+    "matplotlib",
 ]
 
 [tool.setuptools.packages.find]

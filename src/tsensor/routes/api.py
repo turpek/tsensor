@@ -234,3 +234,85 @@ def get_histogram():
         }
 
     return jsonify(all_histograms)
+
+
+import io
+import zipfile
+from datetime import datetime
+import matplotlib
+matplotlib.use("Agg")  # Backend não interativo para web
+import matplotlib.pyplot as plt
+
+
+@api_route.route("/download-charts-zip", methods=["GET"])
+def download_charts_zip():
+    """Gera todos os gráficos no backend usando Matplotlib e retorna um ZIP."""
+    if not manager or len(manager) == 0:
+        return jsonify({"error": "Nenhum sensor configurado."}), 400
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zf:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        for name, handler in manager._handlers.items():
+            safe_name = name.replace(" ", "_")
+            
+            # 1. Gráfico de Série Temporal
+            data_points = handler.time_series.sample
+            if data_points:
+                labels = [p[0] for p in data_points]
+                values = [p[1] for p in data_points]
+                
+                plt.figure(figsize=(10, 6), dpi=100)
+                plt.plot(labels, values, color="#6366f1", linewidth=2, marker="o", markersize=4)
+                plt.title(f"Série Temporal: {name}", fontsize=14, fontweight="bold")
+                plt.xlabel("Tempo", fontsize=10)
+                plt.ylabel("Valor", fontsize=10)
+                plt.xticks(rotation=45, fontsize=8)
+                plt.tight_layout()
+                
+                img_io = io.BytesIO()
+                plt.savefig(img_io, format="png", facecolor="white")
+                plt.close()
+                zf.writestr(f"serie_temporal_{safe_name}_{timestamp}.png", img_io.getvalue())
+
+            # 2. Histograma Global
+            data_raw = np.array(handler.data.data)
+            if len(data_raw) > 0:
+                plt.figure(figsize=(10, 6), dpi=100)
+                plt.hist(data_raw, bins="auto", color="#3b82f6", alpha=0.7, edgecolor="white")
+                plt.title(f"Distribuição de Dados: {name}", fontsize=14, fontweight="bold")
+                plt.xlabel("Valor", fontsize=10)
+                plt.ylabel("Frequência", fontsize=10)
+                plt.grid(axis="y", linestyle="--", alpha=0.7)
+                plt.tight_layout()
+                
+                img_io = io.BytesIO()
+                plt.savefig(img_io, format="png", facecolor="white")
+                plt.close()
+                zf.writestr(f"histograma_{safe_name}_{timestamp}.png", img_io.getvalue())
+
+            # 3. Gráfico de Resíduos (Detrended)
+            if len(data_raw) > 1:
+                residuals = detrend(handler.data.data)
+                plt.figure(figsize=(10, 6), dpi=100)
+                plt.hist(residuals, bins="auto", color="#818cf8", alpha=0.7, edgecolor="white")
+                plt.title(f"Análise Residual (Ruído): {name}", fontsize=14, fontweight="bold")
+                plt.xlabel("Desvio (Resíduo)", fontsize=10)
+                plt.ylabel("Frequência", fontsize=10)
+                plt.grid(axis="y", linestyle="--", alpha=0.7)
+                plt.tight_layout()
+                
+                img_io = io.BytesIO()
+                plt.savefig(img_io, format="png", facecolor="white")
+                plt.close()
+                zf.writestr(f"residuos_{safe_name}_{timestamp}.png", img_io.getvalue())
+
+    zip_buffer.seek(0)
+    from flask import send_file
+    return send_file(
+        zip_buffer,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"tsensor_charts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    )
