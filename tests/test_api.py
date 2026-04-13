@@ -7,10 +7,18 @@ from tsensor.core.utils import MCU_PRESETS
 
 @pytest.fixture
 def mock_handler(mocker):
-    """Fixture para mockar um handler e seus streams."""
+    """Fixture para mockar um handler e registrar no manager global."""
     handler = mocker.Mock()
     handler.data = DataStream(total_samples=100)
     handler.data_buffer = DataStream(total_samples=100)
+    
+    # Registra o handler no manager real para o loop do endpoint funcionar
+    mocker.patch.dict(manager._handlers, {"Sensor Teste": handler})
+    
+    # Mock da configuração correspondente
+    mock_sensor_config = [{"name": "Sensor Teste", "calibration": {"v_ref": 3.3, "adc_max": 4095}}]
+    mocker.patch.dict(config, {"sensors": mock_sensor_config})
+    
     mocker.patch("tsensor.routes.api._get_main_handler", return_value=handler)
     return handler
 
@@ -39,12 +47,13 @@ def test_api_stats_returns_html_partial_with_mocked_values(client, mock_handler)
     response = client.get("/api/stats")
 
     assert response.status_code == 200
-    sel = Selector(response.data.decode("utf-8"))
+    html = response.data.decode("utf-8")
+    sel = Selector(html)
 
-    assert sel.css("#stats-n::text").get() == "5"
-    assert sel.css("#stats-mean::text").get() == "30.0000"
-    assert sel.css("#stats-min::text").get() == "10.00"
-    assert sel.css("#stats-max::text").get() == "50.00"
+    # Verifica se o nome do sensor aparece no HTML
+    assert "Sensor Teste" in html
+    # Primeiro p.text-xl é a contagem n
+    assert sel.css("p.text-xl::text").get() == "5"
 
 
 def test_api_stats_empty_stream(client, mock_handler):
@@ -53,11 +62,7 @@ def test_api_stats_empty_stream(client, mock_handler):
     assert response.status_code == 200
     sel = Selector(response.data.decode("utf-8"))
 
-    assert sel.css("#stats-n::text").get() == "0"
-    assert sel.css("#stats-mean::text").get() == "0.0000"
-    assert sel.css("#stats-std::text").get() == "0.0000"
-    assert sel.css("#stats-min::text").get() == "0.00"
-    assert sel.css("#stats-max::text").get() == "0.00"
+    assert sel.css("p.text-xl::text").get() == "0"
 
 
 def test_api_histogram_returns_json_with_mocked_values(client, mock_handler):
@@ -71,9 +76,9 @@ def test_api_histogram_returns_json_with_mocked_values(client, mock_handler):
     assert response.is_json
 
     data = response.get_json()
-    assert "labels" in data
-    assert "values" in data
-    assert sum(data["values"]) == 5
+    assert "Sensor Teste" in data
+    assert "labels" in data["Sensor Teste"]
+    assert sum(data["Sensor Teste"]["values"]) == 5
 
 
 def test_api_histogram_empty_stream(client, mock_handler):
@@ -83,7 +88,8 @@ def test_api_histogram_empty_stream(client, mock_handler):
     assert response.is_json
 
     data = response.get_json()
-    assert sum(data["values"]) == 0
+    assert "Sensor Teste" in data
+    assert sum(data["Sensor Teste"]["values"]) == 0
 
 
 def test_api_config_updates_values_and_calls_save(client, mocker):

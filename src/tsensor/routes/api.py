@@ -1,7 +1,7 @@
 import numpy as np
 from flask import Blueprint, render_template, jsonify, request
 from tsensor.extensions import manager, config, app_status
-from tsensor.core.utils import save_config, MCU_PRESETS, detrend, Stat, histogram
+from tsensor.core.utils import save_config, detrend, Stat, histogram
 from tsensor.core.acquisition import start_acquisition, stop_acquisition
 from tsensor.core.exporters import CSVExporter
 
@@ -185,37 +185,39 @@ def restart_acquisition_route():
 
 @api_route.route("/stats", methods=["GET"])
 def get_stats():
-    handler = _get_main_handler()
-    if not handler:
-        return render_template("stats_cards.html", stats={})
-
-    ds = handler.data
-    stats_data = {
-        "n": len(ds),
-        "mean": ds.mean,
-        "std": ds.std,
-        "min": ds.min if ds.min != float("inf") else 0,
-        "max": ds.max if ds.max != -float("inf") else 0,
-    }
-    return render_template("stats_cards.html", stats=stats_data)
+    all_stats = {}
+    for name, handler in manager._handlers.items():
+        ds = handler.data
+        all_stats[name] = {
+            "n": len(ds),
+            "mean": ds.mean,
+            "std": ds.std,
+            "min": ds.min if ds.min != float("inf") else 0,
+            "max": ds.max if ds.max != -float("inf") else 0,
+        }
+    return render_template("stats_cards.html", all_stats=all_stats)
 
 
 @api_route.route("/histogram", methods=["GET"])
 def get_histogram():
-    handler = _get_main_handler()
-    if not handler:
-        return jsonify({"labels": [], "values": []})
+    all_histograms = {}
+    for name, handler in manager._handlers.items():
+        # Busca a calibração correta para cada sensor
+        sensor_config = next(
+            (s for s in config["sensors"] if s["name"] == name), None)
+        if not sensor_config:
+            continue
 
-    cal = config["sensors"][0]["calibration"]
-    v_ref = cal["v_ref"]
-    adc_max = cal["adc_max"]
-    res_c = (v_ref / adc_max) * 100
+        cal = sensor_config["calibration"]
+        v_ref = cal["v_ref"]
+        adc_max = cal["adc_max"]
+        res_c = (v_ref / adc_max) * 100
+        decimals = config["presentation"]["decimal_places"]
 
-    decimals = config["presentation"]["decimal_places"]
+        hist_dict = handler.data.histogram(res_c, decimal_label=decimals)
+        all_histograms[name] = {
+            "labels": list(hist_dict.keys()),
+            "values": list(hist_dict.values()),
+        }
 
-    hist_dict = handler.data.histogram(res_c, decimal_label=decimals)
-
-    return jsonify({
-        "labels": list(hist_dict.keys()),
-        "values": list(hist_dict.values()),
-    })
+    return jsonify(all_histograms)

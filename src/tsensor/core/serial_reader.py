@@ -1,5 +1,5 @@
 from loguru import logger
-from serial import Serial, SerialException
+from tsensor.core.serial_connection import Serial, SerialException
 from tsensor.core.handlers import StreamManager
 from tsensor.extensions import app_status
 

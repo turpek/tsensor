@@ -323,8 +323,11 @@
                     <i class="bi bi-circle-fill animate-pulse text-[7px]"></i> LIVE
                 </div>
             </div>
-            <div class="relative h-[360px] w-full" id="histogram-trigger" c-container="/api/histogram" c-type="json" c-callback="renderHistogram">
-                <canvas id="histogramChart"></canvas>
+            <!-- Container Dinâmico para Histogramas -->
+            <div id="histogram-container" class="space-y-12" c-container="/api/histogram" c-type="json" c-callback="renderHistogram">
+                <div class="p-10 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl animate-pulse">
+                    <p class="text-slate-400 text-sm font-bold uppercase tracking-widest">Aguardando dados dos sensores...</p>
+                </div>
             </div>
         </div>
     </main>
@@ -335,7 +338,7 @@
     <script src="{{ url_for('static', filename='js/cru.js') }}"></script>
 
     <script>
-        let chartInstance = null;
+        let chartInstances = {}; // Agora armazena múltiplos gráficos: { "NomeSensor": instance }
         let residualChartInstance = null;
         let pollingIntervalId = null;
 
@@ -455,7 +458,7 @@
             if (pollingIntervalId) clearInterval(pollingIntervalId);
             pollingIntervalId = setInterval(() => {
                 $cruLoadContainer(document.getElementById('stats-container'));
-                $cruLoadContainer(document.getElementById('histogram-trigger'));
+                $cruLoadContainer(document.getElementById('histogram-container'));
             }, {{ config.presentation.update_interval_ms }});
         }
 
@@ -754,35 +757,90 @@
 
         $cruConfig({
             callbacks: {
-                renderHistogram: (data) => {
-                    const ctx = document.getElementById('histogramChart').getContext('2d');
-                    if (chartInstance) {
-                        chartInstance.data.labels = data.labels;
-                        chartInstance.data.datasets[0].data = data.values;
-                        chartInstance.update('none');
-                        return;
+                renderHistogram: (allData) => {
+                    const container = document.getElementById('histogram-container');
+                    
+                    // Se não houver dados, exibe mensagem de espera
+                    if (!allData || Object.keys(allData).length === 0) {
+                        return; // Mantém o que está no container ou pulse inicial
                     }
-                    chartInstance = new Chart(ctx, {
-                        type: 'bar',
-                        data: {
-                            labels: data.labels,
-                            datasets: [{
-                                label: 'Frequência',
-                                data: data.values,
-                                backgroundColor: 'rgba(59, 130, 246, 0.7)',
-                                borderRadius: 12
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
-                            scales: {
-                                y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
-                                x: { grid: { display: false } }
-                            }
+
+                    // Remove o placeholder inicial se ele existir
+                    const pulse = container.querySelector('.animate-pulse');
+                    if (pulse) pulse.remove();
+
+                    // Itera sobre cada sensor recebido
+                    for (const [sensorName, data] of Object.entries(allData)) {
+                        let chartWrapper = document.getElementById(`chart-wrapper-${sensorName.replace(/\s+/g, '-')}`);
+                        
+                        // Cria o wrapper e o canvas se não existirem
+                        if (!chartWrapper) {
+                            const html = `
+                            <div id="chart-wrapper-${sensorName.replace(/\s+/g, '-')}" class="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-6 bg-blue-500 rounded-full"></div>
+                                    <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest">Histograma: ${sensorName}</h4>
+                                </div>
+                                <div class="relative h-[300px] w-full bg-slate-50/50 rounded-3xl p-4 border border-slate-100">
+                                    <canvas id="canvas-${sensorName.replace(/\s+/g, '-')}"></canvas>
+                                </div>
+                            </div>`;
+                            container.insertAdjacentHTML('beforeend', html);
+                            chartWrapper = document.getElementById(`chart-wrapper-${sensorName.replace(/\s+/g, '-')}`);
                         }
-                    });
+
+                        const ctx = document.getElementById(`canvas-${sensorName.replace(/\s+/g, '-')}`).getContext('2d');
+                        
+                        // Cria ou atualiza a instância do Chart.js
+                        if (chartInstances[sensorName]) {
+                            chartInstances[sensorName].data.labels = data.labels;
+                            chartInstances[sensorName].data.datasets[0].data = data.values;
+                            chartInstances[sensorName].update('none');
+                        } else {
+                            chartInstances[sensorName] = new Chart(ctx, {
+                                type: 'bar',
+                                data: {
+                                    labels: data.labels,
+                                    datasets: [{
+                                        label: 'Frequência',
+                                        data: data.values,
+                                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                                        borderRadius: 12,
+                                        borderWidth: 0
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: { 
+                                        legend: { display: false },
+                                        tooltip: {
+                                            backgroundColor: '#0f172a',
+                                            titleFont: { size: 10, weight: 'bold' },
+                                            bodyFont: { size: 12 },
+                                            padding: 12,
+                                            cornerRadius: 12,
+                                            displayColors: false
+                                        }
+                                    },
+                                    scales: {
+                                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, border: { display: false } },
+                                        x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 10, weight: '600' }, color: '#94a3b8' } }
+                                    }
+                                }
+                            });
+                        }
+                    }
+
+                    // Limpeza: remove gráficos de sensores que não estão mais na resposta
+                    for (const existingName in chartInstances) {
+                        if (!allData[existingName]) {
+                            chartInstances[existingName].destroy();
+                            delete chartInstances[existingName];
+                            const wrapper = document.getElementById(`chart-wrapper-${existingName.replace(/\s+/g, '-')}`);
+                            if (wrapper) wrapper.remove();
+                        }
+                    }
                 }
             }
         });

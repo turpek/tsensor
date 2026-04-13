@@ -1,25 +1,41 @@
-<!-- Stats Cards Partial -->
-<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center">
-    <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Amostras (n)</h3>
-    <p id="stats-n" class="text-xl font-bold text-slate-700">{{ stats.n }}</p>
-</div>
+<!-- Stats Cards Partial - Iterando sobre múltiplos sensores -->
+{% for name, stats in all_stats.items() %}
+<div class="sensor-stats-group lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+    <div class="col-span-full flex items-center gap-3 mb-2">
+        <div class="h-[2px] flex-1 bg-slate-100"></div>
+        <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] bg-slate-50 px-4 py-1 rounded-full border border-slate-100">
+            Sensor: {{ name }}
+        </h3>
+        <div class="h-[2px] flex-1 bg-slate-100"></div>
+    </div>
 
-<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center">
-    <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Média (x̄)</h3>
-    <p id="stats-mean" class="text-xl font-bold text-blue-600">{{ "%.4f"|format(stats.mean) }}</p>
-</div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center group hover:border-blue-200 transition-colors">
+        <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Amostras (n)</h3>
+        <p class="text-xl font-bold text-slate-700">{{ stats.n }}</p>
+    </div>
 
-<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center">
-    <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Desvio Padrão (σ)</h3>
-    <p id="stats-std" class="text-xl font-bold text-indigo-600">{{ "%.4f"|format(stats.std) }}</p>
-</div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center group hover:border-blue-200 transition-colors">
+        <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Média (x̄)</h3>
+        <p class="text-xl font-bold text-blue-600">{{ "%.4f"|format(stats.mean) }}</p>
+    </div>
 
-<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center">
-    <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Mínimo</h3>
-    <p id="stats-min" class="text-xl font-bold text-slate-700">{{ "%.2f"|format(stats.min) }}</p>
-</div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center group hover:border-blue-200 transition-colors">
+        <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Desvio Padrão (σ)</h3>
+        <p class="text-xl font-bold text-indigo-600">{{ "%.4f"|format(stats.std) }}</p>
+    </div>
 
-<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center border-r-4 border-r-blue-400">
-    <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Máximo</h3>
-    <p id="stats-max" class="text-xl font-bold text-slate-700">{{ "%.2f"|format(stats.max) }}</p>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center group hover:border-blue-200 transition-colors">
+        <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Mínimo</h3>
+        <p class="text-xl font-bold text-slate-700">{{ "%.2f"|format(stats.min) }}</p>
+    </div>
+
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center border-r-4 border-r-blue-400 group hover:border-blue-200 transition-colors">
+        <h3 class="text-slate-500 text-[10px] font-bold uppercase mb-0.5 tracking-wider">Máximo</h3>
+        <p class="text-xl font-bold text-slate-700">{{ "%.2f"|format(stats.max) }}</p>
+    </div>
 </div>
+{% else %}
+<div class="col-span-full p-10 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl">
+    <p class="text-slate-400 text-sm font-bold uppercase tracking-widest">Nenhum sensor transmitindo dados...</p>
+</div>
+{% endfor %}
