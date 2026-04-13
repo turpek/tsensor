@@ -165,52 +165,7 @@
                         </div>
 
                         <div id="sensors-list" class="space-y-4">
-                            {% for sensor in config.sensors %}
-                            <div class="sensor-card bg-slate-50 p-6 rounded-2xl border-2 border-slate-100 relative group transition-all hover:border-blue-100">
-                                <button type="button" onclick="this.closest('.sensor-card').remove()" class="absolute -top-2 -right-2 bg-white text-red-500 w-8 h-8 rounded-full border border-red-100 shadow-sm flex items-center justify-center hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
-                                    <i class="bi bi-trash3-fill text-xs"></i>
-                                </button>
-                                
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div class="space-y-4">
-                                        <div>
-                                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Identificação</label>
-                                            <input type="text" placeholder="Nome do Sensor" name="sensor_name" value="{{ sensor.name }}" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold">
-                                        </div>
-                                        <div>
-                                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Tipo de Hardware</label>
-                                            <select name="sensor_type" onchange="toggleCalibrationFields(this)" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-semibold cursor-pointer">
-                                                <option value="LM35" {% if sensor.type == 'LM35' %}selected{% endif %}>LM35 (Temperatura)</option>
-                                                <option value="NTC" {% if sensor.type == 'NTC' %}selected{% endif %}>NTC (Temperatura)</option>
-                                                <option value="MPS20N0040D" {% if sensor.type == 'MPS20N0040D' %}selected{% endif %}>MPS20 (Pressão)</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div class="space-y-4">
-                                        <div>
-                                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">ADC Max</label>
-                                            <input type="number" name="sensor_adc_max" value="{{ sensor.calibration.adc_max }}" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold sensor-adc-field">
-                                        </div>
-                                        <div>
-                                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">V_Ref (V)</label>
-                                            <input type="number" step="0.01" name="sensor_v_ref" value="{{ sensor.calibration.v_ref }}" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold sensor-vref-field">
-                                        </div>
-                                    </div>
-
-                                    <div class="space-y-4 calibration-extra {% if sensor.type != 'MPS20N0040D' %}hidden{% endif %}">
-                                        <div>
-                                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Offset (mV)</label>
-                                            <input type="number" step="0.0001" name="sensor_offset" value="{{ sensor.calibration.offset or 22.6 }}" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold text-amber-600">
-                                        </div>
-                                        <div>
-                                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Sensibilidade (mV/kPa)</label>
-                                            <input type="number" step="0.0001" name="sensor_sensitivity" value="{{ sensor.calibration.sensitivity or 1.6949 }}" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold text-amber-600">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
+                            <!-- Inicia vazio. Sensores são adicionados dinamicamente via JS -->
                         </div>
                     </div>
 
@@ -475,11 +430,22 @@
             }, {{ config.presentation.update_interval_ms }});
         }
 
-        function addSensor() {
+        const SENSOR_CATEGORIES = {{ sensor_categories | tojson }};
+
+        function addSensor(data = null) {
             const list = document.getElementById('sensors-list');
             const mcu = document.getElementById('setup-mcu').value;
             const presets = { 'arduino_uno': { vref: 1.1, adc: 1023 }, 'esp32': { vref: 3.3, adc: 4095 } };
             const p = presets[mcu] || presets['esp32'];
+
+            const sensorName = data ? data.name : "";
+            const sensorType = data ? data.type : "";
+            const sensorModel = data ? data.model : "";
+            
+            const adcx = data ? data.calibration.adc_max : p.adc;
+            const vref = data ? data.calibration.v_ref : p.vref;
+            const offset = (data && data.calibration.offset) ? data.calibration.offset : 22.6;
+            const sens = (data && data.calibration.sensitivity) ? data.calibration.sensitivity : 1.6949;
 
             const html = `
             <div class="sensor-card bg-slate-50 p-6 rounded-2xl border-2 border-slate-100 relative group transition-all hover:border-blue-100 animate-in fade-in slide-in-from-top-2">
@@ -489,36 +455,50 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="space-y-4">
                         <div>
-                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Identificação</label>
-                            <input type="text" placeholder="Nome do Sensor" name="sensor_name" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Tipo de Hardware</label>
-                            <select name="sensor_type" onchange="toggleCalibrationFields(this)" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-semibold cursor-pointer">
-                                <option value="LM35">LM35 (Temperatura)</option>
-                                <option value="NTC">NTC (Temperatura)</option>
-                                <option value="MPS20N0040D">MPS20 (Pressão)</option>
+                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Tipo de Medida</label>
+                            <select name="sensor_category" onchange="updateHardwareOptions(this)" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold cursor-pointer">
+                                <option value="" disabled ${!sensorType ? 'selected' : ''}>Selecione...</option>
+                                ${Object.keys(SENSOR_CATEGORIES).map(cat => `<option value="${cat}" ${sensorType === cat ? 'selected' : ''}>${cat}</option>`).join('')}
                             </select>
                         </div>
+                        <div>
+                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Identificador Único</label>
+                            <input type="text" name="sensor_name" placeholder="Ex: Sensor Tanque A" value="${sensorName}" 
+                                   class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold">
+                        </div>
                     </div>
+                    
                     <div class="space-y-4">
                         <div>
-                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">ADC Max</label>
-                            <input type="number" name="sensor_adc_max" value="${p.adc}" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold sensor-adc-field">
+                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Modelo de Hardware</label>
+                            <select name="sensor_model" 
+                                    onchange="toggleCalibrationFields(this)" 
+                                    class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-semibold cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
+                                    ${!sensorType ? 'disabled' : ''}>
+                                <option value="" disabled ${!sensorModel ? 'selected' : ''}>Selecione o Hardware</option>
+                                ${sensorType ? SENSOR_CATEGORIES[sensorType].map(h => `<option value="${h}" ${sensorModel === h ? 'selected' : ''}>${h}</option>`).join('') : ''}
+                            </select>
                         </div>
-                        <div>
-                            <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">V_Ref (V)</label>
-                            <input type="number" step="0.01" name="sensor_v_ref" value="${p.vref}" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold sensor-vref-field">
+                        <div class="grid grid-cols-2 gap-3 calibration-core ${!sensorModel ? 'opacity-30 pointer-events-none' : ''}">
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 ml-1">ADC Max</label>
+                                <input type="number" name="sensor_adc_max" value="${adcx}" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold sensor-adc-field">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 ml-1">V_Ref (V)</label>
+                                <input type="number" step="0.01" name="sensor_v_ref" value="${vref}" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold sensor-vref-field">
+                            </div>
                         </div>
                     </div>
-                    <div class="space-y-4 calibration-extra hidden">
+                    
+                    <div class="space-y-4 calibration-extra ${sensorModel !== 'MPS20N0040D' ? 'hidden' : ''}">
                         <div>
                             <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Offset (mV)</label>
-                            <input type="number" step="0.0001" name="sensor_offset" value="22.6" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold text-amber-600">
+                            <input type="number" step="0.0001" name="sensor_offset" value="${offset}" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold text-amber-600">
                         </div>
                         <div>
                             <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Sensibilidade (mV/kPa)</label>
-                            <input type="number" step="0.0001" name="sensor_sensitivity" value="1.6949" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold text-amber-600">
+                            <input type="number" step="0.0001" name="sensor_sensitivity" value="${sens}" class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold text-amber-600">
                         </div>
                     </div>
                 </div>
@@ -526,9 +506,44 @@
             list.insertAdjacentHTML('beforeend', html);
         }
 
+        function updateHardwareOptions(categorySelect) {
+            const card = categorySelect.closest('.sensor-card');
+            const hardwareSelect = card.querySelector('[name="sensor_model"]');
+            const core = card.querySelector('.calibration-core');
+            const extra = card.querySelector('.calibration-extra');
+            const category = categorySelect.value;
+
+            hardwareSelect.innerHTML = `<option value="" disabled selected>Selecione o Hardware</option>`;
+            
+            if (category && SENSOR_CATEGORIES[category]) {
+                SENSOR_CATEGORIES[category].forEach(h => {
+                    const opt = document.createElement('option');
+                    opt.value = h;
+                    opt.textContent = h;
+                    hardwareSelect.appendChild(opt);
+                });
+                hardwareSelect.disabled = false;
+                hardwareSelect.classList.remove('bg-slate-200');
+            } else {
+                hardwareSelect.disabled = true;
+                hardwareSelect.classList.add('bg-slate-200');
+            }
+
+            core.classList.add('opacity-30', 'pointer-events-none');
+            extra.classList.add('hidden');
+        }
+
         function toggleCalibrationFields(select) {
             const card = select.closest('.sensor-card');
+            const core = card.querySelector('.calibration-core');
             const extra = card.querySelector('.calibration-extra');
+            
+            if (select.value) {
+                core.classList.remove('opacity-30', 'pointer-events-none');
+            } else {
+                core.classList.add('opacity-30', 'pointer-events-none');
+            }
+
             if (select.value === 'MPS20N0040D') {
                 extra.classList.remove('hidden');
             } else {
@@ -538,16 +553,23 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             checkStatus();
+
+            const existingSensors = {{ config.sensors | tojson }};
+            if (existingSensors && existingSensors.length > 0) {
+                existingSensors.forEach(s => addSensor(s));
+            }
+
             const presets = { 'arduino_uno': { vref: 1.1, adc: 1023 }, 'esp32': { vref: 3.3, adc: 4095 } };
 
-            // Controle de Limites (Enable/Disable)
             const setupLimitToggle = (chkId, inputId) => {
                 const chk = document.getElementById(chkId);
                 const input = document.getElementById(inputId);
-                chk.addEventListener('change', () => {
-                    input.disabled = !chk.checked;
-                    if (chk.checked) input.focus();
-                });
+                if (chk && input) {
+                    chk.addEventListener('change', () => {
+                        input.disabled = !chk.checked;
+                        if (chk.checked) input.focus();
+                    });
+                }
             };
 
             setupLimitToggle('chk-limit-samples', 'input-total-samples');
@@ -556,7 +578,6 @@
             document.getElementById('setup-mcu').addEventListener('change', (e) => {
                 const p = presets[e.target.value];
                 if (p) {
-                    // Atualiza campos de sensores existentes se o usuário desejar
                     const updateSensors = confirm("Deseja aplicar os padrões do novo MCU a todos os sensores?");
                     if (updateSensors) {
                         document.querySelectorAll('.sensor-adc-field').forEach(f => f.value = p.adc);
@@ -568,6 +589,18 @@
             document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 
+                const errBox = document.getElementById('setup-error');
+                const errText = document.getElementById('setup-error-text');
+                const sensorCards = document.querySelectorAll('.sensor-card');
+
+                // Validação 1: Pelo menos um sensor
+                if (sensorCards.length === 0) {
+                    errText.innerText = "É necessário adicionar pelo menos um sensor para iniciar a monitoração.";
+                    errBox.classList.remove('hidden');
+                    switchTab('sensors');
+                    return;
+                }
+
                 // Coleta dados globais
                 const formData = new FormData(e.target);
                 const payload = {
@@ -585,32 +618,59 @@
                     sensors: []
                 };
 
-                // Coleta dados de cada sensor individualmente
-                document.querySelectorAll('.sensor-card').forEach(card => {
+                // Validação 2: Sensores completos
+                let incomplete = false;
+                sensorCards.forEach(card => {
+                    const name = card.querySelector('[name="sensor_name"]').value.trim();
+                    const type = card.querySelector('[name="sensor_category"]').value;
+                    const model = card.querySelector('[name="sensor_model"]').value;
+
+                    if (!name || !type || !model) {
+                        incomplete = true;
+                        card.classList.add('border-red-400', 'bg-red-50');
+                    } else {
+                        card.classList.remove('border-red-400', 'bg-red-50');
+                    }
+
                     const sensor = {
-                        name: card.querySelector('[name="sensor_name"]').value || "Sensor",
-                        type: card.querySelector('[name="sensor_type"]').value,
+                        name: name,
+                        type: type,
+                        model: model,
                         calibration: {
                             adc_max: parseInt(card.querySelector('[name="sensor_adc_max"]').value),
                             v_ref: parseFloat(card.querySelector('[name="sensor_v_ref"]').value)
                         }
                     };
 
-                    // Adiciona campos extras se for pressão
-                    if (sensor.type === 'MPS20N0040D') {
+                    if (sensor.model === 'MPS20N0040D') {
                         sensor.calibration.offset = parseFloat(card.querySelector('[name="sensor_offset"]').value);
                         sensor.calibration.sensitivity = parseFloat(card.querySelector('[name="sensor_sensitivity"]').value);
                     }
-
                     payload.sensors.push(sensor);
                 });
 
+                if (incomplete) {
+                    errText.innerText = "Por favor, preencha Identificador, Tipo e Hardware de todos os sensores.";
+                    errBox.classList.remove('hidden');
+                    switchTab('sensors');
+                    return;
+                }
+
+                errBox.classList.add('hidden');
+                
                 const res = await fetch('/api/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                if (res.ok) setTimeout(checkStatus, 500);
+                
+                if (res.ok) {
+                    setTimeout(checkStatus, 500);
+                } else {
+                    const data = await res.json();
+                    errText.innerText = data.error || "Erro ao salvar configuração.";
+                    errBox.classList.remove('hidden');
+                }
             });
 
             document.getElementById('export-btn').addEventListener('click', async () => {

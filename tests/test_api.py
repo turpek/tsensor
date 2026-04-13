@@ -90,7 +90,7 @@ def test_api_config_updates_values_and_calls_save(client, mocker):
     """Verifica se a rota /api/config processa o POST e chama save_config."""
     mock_config = {
         "hardware": {"port": "/old/port", "mcu": "arduino_uno", "baudrate": 9600},
-        "sensors": [{"name": "s1", "type": "LM35", "calibration": {"adc_max": 1023, "v_ref": 1.1}}],
+        "sensors": [{"name": "Sensor 1", "type": "temperature", "model": "LM35", "calibration": {"adc_max": 1023, "v_ref": 1.1}}],
         "acquisition": {"total_samples": 1000},
         "presentation": {
             "update_interval_ms": 500,
@@ -124,7 +124,7 @@ def test_api_config_saves_and_applies_presets(mocker, client):
     # Mock do config atual para garantir transição
     mock_config = {
         "hardware": {"port": "/dev/ttyUSB0", "mcu": "arduino_uno", "baudrate": 9600},
-        "sensors": [{"name": "s1", "type": "LM35", "calibration": {"adc_max": 1023, "v_ref": 1.1}}],
+        "sensors": [{"name": "Sensor 1", "type": "temperature", "model": "LM35", "calibration": {"adc_max": 1023, "v_ref": 1.1}}],
         "acquisition": {"total_samples": 1000},
         "presentation": {
             "update_interval_ms": 500,
@@ -140,7 +140,7 @@ def test_api_config_saves_and_applies_presets(mocker, client):
         "port": "/dev/ttyUSB1",
         "mcu": "esp32",
         "baudrate": "115200",
-        "sensors": [{"name": "s1", "type": "LM35", "calibration": {"adc_max": 4095, "v_ref": 3.3}}]
+        "sensors": [{"name": "Sensor 1", "type": "temperature", "model": "LM35", "calibration": {"adc_max": 4095, "v_ref": 3.3}}]
     }
 
     response = client.post("/api/config", json=payload)
@@ -256,3 +256,20 @@ def test_api_update_config_advanced_and_debug(client, mocker):
     assert config["presentation"]["debug_mode"] is True
     assert config["presentation"]["log_level"] == "DEBUG"
     assert config["presentation"]["decimal_places"] == 3
+
+
+def test_api_config_rejects_empty_sensors_list(client, mocker):
+    """Valida que a API rejeita um payload onde a lista de sensores está vazia."""
+    mocker.patch("tsensor.routes.api.save_config")
+    
+    payload = {
+        "port": "/dev/ttyUSB0",
+        "mcu": "esp32",
+        "baudrate": 115200,
+        "sensors": []
+    }
+
+    response = client.post("/api/config", json=payload)
+    
+    assert response.status_code == 400
+    assert "pelo menos um sensor" in response.get_json()["error"]

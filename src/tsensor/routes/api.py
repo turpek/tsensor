@@ -117,6 +117,8 @@ def update_config():
 
     # Se sensors vier no payload, sobrescreve a lista completa
     if "sensors" in data:
+        if not data["sensors"] or len(data["sensors"]) == 0:
+            return jsonify({"error": "A configuração deve conter pelo menos um sensor."}), 400
         config["sensors"] = data["sensors"]
 
     # Atualiza configurações de aquisição

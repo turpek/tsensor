@@ -9,6 +9,15 @@ import copy
 # Caminho absoluto para o arquivo de configuração
 CONFIG_PATH = os.path.join(os.getcwd(), "config.toml")
 
+
+def get_sensor_models() -> dict:
+    """Retorna o mapeamento de tipos de grandeza e seus modelos de hardware compatíveis."""
+    return {
+        "temperature": ["LM35", "NTC"],
+        "pressure": ["MPS20N0040D"],
+    }
+
+
 # Template padrão para inicialização do sistema
 DEFAULT_CONFIG = {
     "hardware": {
@@ -17,26 +26,7 @@ DEFAULT_CONFIG = {
         "timeout": 1.0,
         "mcu": "esp32",
     },
-    "sensors": [
-        {
-            "name": "temperatura",
-            "type": "LM35",
-            "calibration": {
-                "adc_max": 4095,
-                "v_ref": 3.3,
-            },
-        },
-        {
-            "name": "pressao",
-            "type": "MPS20N0040D",
-            "calibration": {
-                "adc_max": 4095,
-                "v_ref": 3.3,
-                "offset": 22.6,
-                "sensitivity": 1.6949,
-            },
-        },
-    ],
+    "sensors": [],  # Inicia sem nenhum sensor por padrão
     "acquisition": {
         "total_samples": 1000000,
         "buffer_samples": 1000,
@@ -75,33 +65,28 @@ def load_config() -> dict:
     """Carrega as configurações do arquivo TOML ou usa o template padrão."""
     if not os.path.exists(CONFIG_PATH):
         # Se não existir, retorna uma cópia profunda do template padrão
-        return copy.deepcopy(DEFAULT_CONFIG)
-
-    with open(CONFIG_PATH, "r") as f:
-        config = toml.load(f)
+        config = copy.deepcopy(DEFAULT_CONFIG)
+        # Garante que inicia sem sensores se for a primeira vez
+        config["sensors"] = []
+    else:
+        with open(CONFIG_PATH, "r") as f:
+            config = toml.load(f)
 
     # Resolve os padrões baseados no MCU para garantir integridade
-    mcu_type = config.get("hardware", {}).get("mcu", "arduino_uno")
+    mcu_type = config.get("hardware", {}).get("mcu", "esp32")
     preset = MCU_PRESETS.get(mcu_type, MCU_PRESETS["arduino_uno"])
 
-    # Garante que a lista de sensores existe e aplica presets se necessário
-    injected_sensors = False
+    # Garante que a lista de sensores existe
     if "sensors" not in config:
-        config["sensors"] = copy.deepcopy(DEFAULT_CONFIG["sensors"])
-        injected_sensors = True
+        config["sensors"] = []
 
     for sensor in config["sensors"]:
         if "calibration" not in sensor:
             sensor["calibration"] = {}
 
-        # Se os sensores foram injetados agora, forçamos o preset do MCU atual
-        # Caso contrário, só aplicamos se o campo estiver faltando (respeita calibração manual do TOML)
-        if injected_sensors:
-            sensor["calibration"]["adc_max"] = preset["adc_max"]
-            sensor["calibration"]["v_ref"] = preset["v_ref"]
-        else:
-            sensor["calibration"].setdefault("adc_max", preset["adc_max"])
-            sensor["calibration"].setdefault("v_ref", preset["v_ref"])
+        # Só aplica o preset se o campo não existir (não sobrescreve calibração manual)
+        sensor["calibration"].setdefault("adc_max", preset["adc_max"])
+        sensor["calibration"].setdefault("v_ref", preset["v_ref"])
 
     return config
 

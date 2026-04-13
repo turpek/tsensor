@@ -19,15 +19,15 @@ def setup_manager(config: dict) -> StreamManager:
     buffer_limit = config["acquisition"].get("buffer_samples", 1000)
 
     for sensor in config.get('sensors', []):
-        sensor_type = sensor["type"]
-        if sensor_type not in HANDLERS:
-            logger.error(f"Tipo de sensor desconhecido: {sensor_type}")
+        sensor_model = sensor.get("model")
+        if sensor_model not in HANDLERS:
+            logger.error(f"Modelo de sensor desconhecido: {sensor_model}")
             continue
 
         data_stream = DataStream(total_samples=session_limit)
         data_buffer = DataStream(total_samples=buffer_limit)
 
-        cls_handler = HANDLERS.get(sensor_type)
+        cls_handler = HANDLERS.get(sensor_model)
         kwargs = sensor.get('calibration')
         name = sensor.get('name')
         handler = cls_handler(data_stream, data_buffer, **kwargs)

@@ -16,12 +16,18 @@ def test_load_config_applies_mcu_presets_from_file(mocker):
     mocker.patch("os.path.exists", return_value=True)
     mocker.patch("builtins.open", mocker.mock_open(read_data=""))
     mocker.patch(
-        "toml.load", return_value={"hardware": {"mcu": "arduino_uno"}}
+        "toml.load", return_value={
+            "hardware": {"mcu": "arduino_uno"},
+            "sensors": [
+                {"name": "s1", "type": "temperature", "model": "LM35"} # Sem calibração
+            ]
+        }
     )
     config = load_config()
     assert config["hardware"]["mcu"] == "arduino_uno"
+    assert len(config["sensors"]) == 1
 
-    # Verifica se os presets foram aplicados aos sensores padrão injetados
-    for sensor in config["sensors"]:
-        assert sensor["calibration"]["adc_max"] == MCU_PRESETS["arduino_uno"]["adc_max"]
-        assert sensor["calibration"]["v_ref"] == MCU_PRESETS["arduino_uno"]["v_ref"]
+    # Verifica se os presets foram aplicados aos sensores existentes
+    sensor = config["sensors"][0]
+    assert sensor["calibration"]["adc_max"] == MCU_PRESETS["arduino_uno"]["adc_max"]
+    assert sensor["calibration"]["v_ref"] == MCU_PRESETS["arduino_uno"]["v_ref"]
