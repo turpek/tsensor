@@ -15,6 +15,11 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .tab-btn.active { background-color: white; box-shadow: 0 1px 2px rgba(0,0,0,0.05); color: #2563eb; border: 1px solid #e2e8f0; }
+        
+        /* Remove spinners de inputs numéricos */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; appearance: textfield; }
     </style>
 </head>
 <body class="text-slate-900 antialiased">
@@ -557,11 +562,11 @@
                         <div class="grid grid-cols-2 gap-3.5 calibration-core ${!sensorModel ? 'opacity-30 pointer-events-none' : ''}">
                             <div>
                                 <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 ml-1">ADC Max</label>
-                                <input type="number" name="sensor_adc_max" value="${adcx}" class="w-full px-2.5 py-2.5 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold sensor-adc-field">
+                                <input type="number" name="sensor_adc_max" value="${adcx}" class="w-full px-2 py-2.5 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold sensor-adc-field">
                             </div>
                             <div>
                                 <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 ml-1">V_Ref (V)</label>
-                                <input type="number" step="0.01" name="sensor_v_ref" value="${vref}" class="w-full px-2.5 py-2.5 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold sensor-vref-field">
+                                <input type="number" step="0.01" name="sensor_v_ref" value="${vref}" class="w-full px-2 py-2.5 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold sensor-vref-field">
                             </div>
                         </div>
                     </div>
