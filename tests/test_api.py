@@ -53,8 +53,8 @@ def test_api_stats_returns_html_partial_with_mocked_values(client, mock_handler)
 
     # Verifica se o nome do sensor aparece no HTML
     assert "Sensor Teste" in html
-    # Primeiro p.text-xl é a contagem n
-    assert sel.css("p.text-xl::text").get() == "5"
+    # Primeiro p.text-2xl é a contagem n
+    assert sel.css("p.text-2xl::text").get() == "5"
 
 
 def test_api_stats_empty_stream(client, mock_handler):
@@ -63,7 +63,7 @@ def test_api_stats_empty_stream(client, mock_handler):
     assert response.status_code == 200
     sel = Selector(response.data.decode("utf-8"))
 
-    assert sel.css("p.text-xl::text").get() == "0"
+    assert sel.css("p.text-2xl::text").get() == "0"
 
 
 def test_api_histogram_returns_json_with_mocked_values(client, mock_handler):
