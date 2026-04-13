@@ -4,6 +4,7 @@ from typing import Optional
 import numpy as np
 import os
 import toml
+import copy
 
 # Caminho absoluto para o arquivo de configuração
 CONFIG_PATH = os.path.join(os.getcwd(), "config.toml")
@@ -16,11 +17,26 @@ DEFAULT_CONFIG = {
         "timeout": 1.0,
         "mcu": "esp32",
     },
-    "sensor": {
-        "type": "LM35",
-        "adc_max": 4095,
-        "v_ref": 3.3,
-    },
+    "sensors": [
+        {
+            "name": "temperatura",
+            "type": "LM35",
+            "calibration": {
+                "adc_max": 4095,
+                "v_ref": 3.3,
+            },
+        },
+        {
+            "name": "pressao",
+            "type": "MPS20N0040D",
+            "calibration": {
+                "adc_max": 4095,
+                "v_ref": 3.3,
+                "offset": 22.6,
+                "sensitivity": 1.6949,
+            },
+        },
+    ],
     "acquisition": {
         "total_samples": 1000000,
         "buffer_samples": 1000,
@@ -59,8 +75,6 @@ def load_config() -> dict:
     """Carrega as configurações do arquivo TOML ou usa o template padrão."""
     if not os.path.exists(CONFIG_PATH):
         # Se não existir, retorna uma cópia profunda do template padrão
-        import copy
-
         return copy.deepcopy(DEFAULT_CONFIG)
 
     with open(CONFIG_PATH, "r") as f:
@@ -70,11 +84,24 @@ def load_config() -> dict:
     mcu_type = config.get("hardware", {}).get("mcu", "arduino_uno")
     preset = MCU_PRESETS.get(mcu_type, MCU_PRESETS["arduino_uno"])
 
-    if "sensor" not in config:
-        config["sensor"] = {}
+    # Garante que a lista de sensores existe e aplica presets se necessário
+    injected_sensors = False
+    if "sensors" not in config:
+        config["sensors"] = copy.deepcopy(DEFAULT_CONFIG["sensors"])
+        injected_sensors = True
 
-    config["sensor"].setdefault("adc_max", preset["adc_max"])
-    config["sensor"].setdefault("v_ref", preset["v_ref"])
+    for sensor in config["sensors"]:
+        if "calibration" not in sensor:
+            sensor["calibration"] = {}
+
+        # Se os sensores foram injetados agora, forçamos o preset do MCU atual
+        # Caso contrário, só aplicamos se o campo estiver faltando (respeita calibração manual do TOML)
+        if injected_sensors:
+            sensor["calibration"]["adc_max"] = preset["adc_max"]
+            sensor["calibration"]["v_ref"] = preset["v_ref"]
+        else:
+            sensor["calibration"].setdefault("adc_max", preset["adc_max"])
+            sensor["calibration"].setdefault("v_ref", preset["v_ref"])
 
     return config
 
@@ -216,7 +243,6 @@ class Stat:
         self._update_stats(new_data)
 
     def clear(self, total_samples: Optional[int] = None) -> None:
-        self._max = 0.0
         self._total_count = 0
         self._tc_samples = 0
         self._moving_sum = 0.0

@@ -7,11 +7,12 @@ def test_load_config_returns_default_when_file_missing(mocker):
     config = load_config()
     assert config == DEFAULT_CONFIG
     assert config is not DEFAULT_CONFIG
+    # O default no template agora é esp32
     assert config["hardware"]["mcu"] == "esp32"
 
 
 def test_load_config_applies_mcu_presets_from_file(mocker):
-    """Valida se os presets do MCU são aplicados ao carregar arquivo parcial."""
+    """Valida se os presets do MCU são aplicados à lista de sensores ao carregar arquivo parcial."""
     mocker.patch("os.path.exists", return_value=True)
     mocker.patch("builtins.open", mocker.mock_open(read_data=""))
     mocker.patch(
@@ -19,5 +20,8 @@ def test_load_config_applies_mcu_presets_from_file(mocker):
     )
     config = load_config()
     assert config["hardware"]["mcu"] == "arduino_uno"
-    assert config["sensor"]["adc_max"] == MCU_PRESETS["arduino_uno"]["adc_max"]
-    assert config["sensor"]["v_ref"] == MCU_PRESETS["arduino_uno"]["v_ref"]
+
+    # Verifica se os presets foram aplicados aos sensores padrão injetados
+    for sensor in config["sensors"]:
+        assert sensor["calibration"]["adc_max"] == MCU_PRESETS["arduino_uno"]["adc_max"]
+        assert sensor["calibration"]["v_ref"] == MCU_PRESETS["arduino_uno"]["v_ref"]

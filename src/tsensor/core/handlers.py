@@ -17,8 +17,7 @@ class SerialHandler(Protocol):
     def __init__(
         self,
         data: DataStream,
-        temporal_data: DataStream,
-        samples: int,
+        data_buffer: DataStream,
         adc_max: int,
         v_ref: float,
     ):
@@ -32,7 +31,7 @@ class SerialHandler(Protocol):
         ...
 
     @property
-    def temporal_data(self) -> DataStream:
+    def data_buffer(self) -> DataStream:
         ...
 
 
@@ -40,14 +39,12 @@ class TemperatureHandler(ABC):
     def __init__(
         self,
         data: DataStream,
-        temporal_data: DataStream,
-        samples: int,
+        data_buffer: DataStream,
         adc_max: int,
         v_ref: float,
     ):
         self._data = data
-        self._temporal_data = temporal_data
-        self._samples = samples
+        self._data_buffer = data_buffer
         self._adc_max = adc_max
         self._v_ref = v_ref
         self._re = re.compile(f"T={REG_ADC_VALUE}")
@@ -75,13 +72,13 @@ class TemperatureHandler(ABC):
             time_now = timestamp()
             logger.debug(f"temperatura: {temperature:.4f}")
             self._data.add(temperature, time_now)
-            self._temporal_data.add(temperature, time_now)
+            self._data_buffer.add(temperature, time_now)
             return True
         return False
 
     @property
-    def temporal_data(self) -> DataStream:
-        return self._temporal_data
+    def data_buffer(self) -> DataStream:
+        return self._data_buffer
 
     @property
     def data(self) -> DataStream:
@@ -112,47 +109,42 @@ class LM35Handler(TemperatureHandler):
 
 
 class StreamManager:
-    def __init__(
+    def __init__(self):
+        self._timeout: Optional[int]
+        self._start: float
+        self._active: bool
+        self._handlers: dict[str, SerialHandler] = {}
+        self._total_samples: Optional[int]
+        self._count: int
+
+    def configure(
         self,
-        samples: int,
-        adc_max: int,
-        v_ref: float,
         timeout: Optional[int] = None,
         total_samples: Optional[int] = None,
     ):
-        self._samples = samples
         self._timeout = timeout
         self._start = time()
-        self._adc_max = adc_max
-        self._v_ref = v_ref
         self._active = True
-        self._handlers: dict[str, SerialHandler] = {}
+        self._handlers = {}
         self._total_samples = total_samples
         self._count = 0
 
-    def add_handler(
-        self,
-        name: str,
-        cls_handler: type[SerialHandler],
-        data: DataStream,
-        temporal_data: DataStream,
-    ) -> None:
+    def __len__(self) -> int:
+        """Retorna a quantidade de handlers."""
+        return len(self._handlers)
 
-        self._handlers[name] = cls_handler(
-            data,
-            temporal_data,
-            self._samples,
-            self._adc_max,
-            self._v_ref,
-        )
+    def add_handler(self, name: str, handler: SerialHandler) -> None:
+        self._handlers[name] = handler
 
     def get_handler(self, name: str) -> None | SerialHandler:
         return self._handlers.get(name)
 
     def dispatch(self, line: str) -> None:
+        counts = [self._count]
         for handler in self._handlers.values():
-            if handler.handle(line):
-                self._count += 1
+            handler.handle(line)
+            counts.append(len(handler.data))
+        self._count = max(counts)
 
     def stop(self) -> None:
         self._active = False
@@ -166,11 +158,11 @@ class StreamManager:
         # Se houver timeout, verifica o tempo decorrido
         if self._timeout is not None and (time() - self._start > self._timeout):
             return False
-        
+
         # Se houver limite de amostras, verifica a contagem
         if isinstance(self._total_samples, int) and self._count >= self._total_samples:
             return False
-            
+
         return self._active
 
 

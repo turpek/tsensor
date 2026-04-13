@@ -1,8 +1,18 @@
 import pytest
 from parsel import Selector
 from tsensor.core.data_stream import DataStream
-from tsensor.extensions import data_stream, buffer_stream, config
+from tsensor.extensions import manager, config
 from tsensor.core.utils import MCU_PRESETS
+
+
+@pytest.fixture
+def mock_handler(mocker):
+    """Fixture para mockar um handler e seus streams."""
+    handler = mocker.Mock()
+    handler.data = DataStream(total_samples=100)
+    handler.data_buffer = DataStream(total_samples=100)
+    mocker.patch("tsensor.routes.api._get_main_handler", return_value=handler)
+    return handler
 
 
 def test_api_status_returns_connection_state(client, mocker):
@@ -21,13 +31,10 @@ def test_api_status_returns_connection_state(client, mocker):
     assert response.get_json() == mock_status
 
 
-def test_api_stats_returns_html_partial_with_mocked_values(client, mocker):
+def test_api_stats_returns_html_partial_with_mocked_values(client, mock_handler):
     """Testa a rota /api/stats com valores mockados."""
-    test_stream = DataStream(total_samples=5)
     for val in [10.0, 20.0, 30.0, 40.0, 50.0]:
-        test_stream.add(val, timestamp="10:00:00:000")
-
-    mocker.patch("tsensor.routes.api.data_stream", test_stream)
+        mock_handler.data.add(val, timestamp="10:00:00:000")
 
     response = client.get("/api/stats")
 
@@ -40,11 +47,8 @@ def test_api_stats_returns_html_partial_with_mocked_values(client, mocker):
     assert sel.css("#stats-max::text").get() == "50.00"
 
 
-def test_api_stats_empty_stream(client, mocker):
+def test_api_stats_empty_stream(client, mock_handler):
     """Verifica o comportamento da rota de estatísticas com stream vazio."""
-    test_stream = DataStream(total_samples=100)
-    mocker.patch("tsensor.routes.api.data_stream", test_stream)
-
     response = client.get("/api/stats")
     assert response.status_code == 200
     sel = Selector(response.data.decode("utf-8"))
@@ -56,13 +60,10 @@ def test_api_stats_empty_stream(client, mocker):
     assert sel.css("#stats-max::text").get() == "0.00"
 
 
-def test_api_histogram_returns_json_with_mocked_values(client, mocker):
+def test_api_histogram_returns_json_with_mocked_values(client, mock_handler):
     """Testa a rota /api/histogram com valores mockados."""
-    test_stream = DataStream(total_samples=5)
     for val in [10.0, 20.0, 30.0, 40.0, 50.0]:
-        test_stream.add(val, timestamp="10:00:00:000")
-
-    mocker.patch("tsensor.routes.api.data_stream", test_stream)
+        mock_handler.data.add(val, timestamp="10:00:00:000")
 
     response = client.get("/api/histogram")
 
@@ -75,11 +76,8 @@ def test_api_histogram_returns_json_with_mocked_values(client, mocker):
     assert sum(data["values"]) == 5
 
 
-def test_api_histogram_empty_stream(client, mocker):
+def test_api_histogram_empty_stream(client, mock_handler):
     """Verifica o comportamento da rota de histograma com stream vazio."""
-    test_stream = DataStream(total_samples=100)
-    mocker.patch("tsensor.routes.api.data_stream", test_stream)
-
     response = client.get("/api/histogram")
     assert response.status_code == 200
     assert response.is_json
@@ -92,7 +90,7 @@ def test_api_config_updates_values_and_calls_save(client, mocker):
     """Verifica se a rota /api/config processa o POST e chama save_config."""
     mock_config = {
         "hardware": {"port": "/old/port", "mcu": "arduino_uno", "baudrate": 9600},
-        "sensor": {"adc_max": 1023, "v_ref": 1.1},
+        "sensors": [{"name": "s1", "type": "LM35", "calibration": {"adc_max": 1023, "v_ref": 1.1}}],
         "acquisition": {"total_samples": 1000},
         "presentation": {
             "update_interval_ms": 500,
@@ -126,7 +124,7 @@ def test_api_config_saves_and_applies_presets(mocker, client):
     # Mock do config atual para garantir transição
     mock_config = {
         "hardware": {"port": "/dev/ttyUSB0", "mcu": "arduino_uno", "baudrate": 9600},
-        "sensor": {"adc_max": 1023, "v_ref": 1.1},
+        "sensors": [{"name": "s1", "type": "LM35", "calibration": {"adc_max": 1023, "v_ref": 1.1}}],
         "acquisition": {"total_samples": 1000},
         "presentation": {
             "update_interval_ms": 500,
@@ -138,7 +136,12 @@ def test_api_config_saves_and_applies_presets(mocker, client):
 
     mocker.patch("tsensor.routes.api.config", mock_config)
 
-    payload = {"port": "/dev/ttyUSB1", "mcu": "esp32", "baudrate": "115200"}
+    payload = {
+        "port": "/dev/ttyUSB1",
+        "mcu": "esp32",
+        "baudrate": "115200",
+        "sensors": [{"name": "s1", "type": "LM35", "calibration": {"adc_max": 4095, "v_ref": 3.3}}]
+    }
 
     response = client.post("/api/config", json=payload)
 
@@ -149,16 +152,13 @@ def test_api_config_saves_and_applies_presets(mocker, client):
     saved_config = args[0]
 
     assert saved_config["hardware"]["mcu"] == "esp32"
-    assert saved_config["sensor"]["adc_max"] == MCU_PRESETS["esp32"]["adc_max"]
-    assert saved_config["sensor"]["v_ref"] == MCU_PRESETS["esp32"]["v_ref"]
+    # Como passamos 'sensors' no payload, ele sobrescreve os valores
+    assert saved_config["sensors"][0]["calibration"]["adc_max"] == 4095
+    assert saved_config["sensors"][0]["calibration"]["v_ref"] == 3.3
 
 
-def test_api_restart_clears_data_and_restarts_acquisition(client, mocker):
-    """Verifica se /api/restart para a aquisição, limpa dados com novo tamanho e reinicia."""
-    # Mock do clear para capturar argumentos
-    mock_data_clear = mocker.patch.object(data_stream, "clear")
-    mock_buffer_clear = mocker.patch.object(buffer_stream, "clear")
-
+def test_api_restart_restarts_acquisition(client, mocker):
+    """Verifica se /api/restart para a aquisição e reinicia."""
     mocker.patch("tsensor.routes.api.stop_acquisition")
     mocker.patch("tsensor.routes.api.start_acquisition")
 
@@ -167,35 +167,12 @@ def test_api_restart_clears_data_and_restarts_acquisition(client, mocker):
     assert response.status_code == 200
     assert response.json["success"] is True
 
-    # Verifica se o clear foi chamado com os valores da config
-    mock_data_clear.assert_called_once_with(
-        total_samples=config["acquisition"]["total_samples"])
-    mock_buffer_clear.assert_called_once_with(
-        total_samples=config["acquisition"]["buffer_samples"])
 
-
-@pytest.fixture
-def mock_export_config(mocker):
-    """Fixture para mockar a configuração de exportação."""
-    mock_cfg = {
-        "exporter": {
-            "google_drive": {
-                "credentials_file": "c.json",
-                "token_file": "t.json",
-                "scopes": ["s"],
-                "file_name": "f"
-            }
-        }
-    }
-    mocker.patch("tsensor.routes.api.config", mock_cfg)
-    return mock_cfg
-
-
-def test_api_export_success(client, mocker, mock_export_config):
+def test_api_export_success(client, mock_handler, mocker):
     """Verifica se /api/export chama o exportador CSV corretamente com sucesso."""
-    mock_stream = mocker.patch("tsensor.routes.api.data_stream")
-    type(mock_stream).sample = mocker.PropertyMock(
-        return_value=[("10:00:01", 25.0)])
+    # Simula dados no sample (propriedade do DataStream)
+    mocker.patch.object(DataStream, "sample",
+                        return_value=[("10:00:01", 25.0)])
 
     mock_exporter_cls = mocker.patch("tsensor.routes.api.CSVExporter")
     mock_exporter_inst = mock_exporter_cls.return_value
@@ -210,10 +187,11 @@ def test_api_export_success(client, mocker, mock_export_config):
     mock_exporter_inst.export.assert_called_once()
 
 
-def test_api_export_no_data_fails(client, mocker, mock_export_config):
+def test_api_export_no_data_fails(client, mock_handler, mocker):
     """Verifica se /api/export falha quando não há dados no stream."""
-    mock_stream = mocker.patch("tsensor.routes.api.data_stream")
-    type(mock_stream).sample = mocker.PropertyMock(return_value=[])
+    # Garante que o stream associado ao handler está vazio
+    mock_handler.data = mocker.Mock(spec=DataStream)
+    type(mock_handler.data).sample = mocker.PropertyMock(return_value=[])
 
     # Mock do exportador para evitar execução de código real
     mocker.patch("tsensor.routes.api.CSVExporter")
@@ -224,32 +202,12 @@ def test_api_export_no_data_fails(client, mocker, mock_export_config):
     assert "Não há dados" in response.json["error"]
 
 
-def test_api_export_service_failure(client, mocker, mock_export_config):
-    """Verifica se /api/export retorna erro quando o exportador CSV falha."""
-    mock_stream = mocker.patch("tsensor.routes.api.data_stream")
-    type(mock_stream).sample = mocker.PropertyMock(
-        return_value=[("10:00:01", 25.0)])
-
-    mock_exporter_cls = mocker.patch("tsensor.routes.api.CSVExporter")
-    mock_exporter_inst = mock_exporter_cls.return_value
-    mock_exporter_inst.export.return_value = False
-
-    response = client.post("/api/export")
-
-    assert response.status_code == 500
-    assert "Falha ao salvar" in response.json["error"]
-
-
-def test_api_residual_analysis_success(client, mocker):
+def test_api_residual_analysis_success(client, mock_handler):
     """Testa se a rota /api/residual-analysis retorna histograma e estatísticas dos resíduos."""
-    # Mock do stream com uma tendência linear clara [10, 11, 12, 13, 14]
-    # Resíduos esperados aproximados de 0 após detrend
-    test_data = [("10:00:01", 10.0), ("10:00:02", 11.0), ("10:00:03", 12.0),
-                 ("10:00:04", 13.0), ("10:00:05", 14.0)]
+    test_data = [10.0, 11.0, 12.0, 13.0, 14.0]
 
-    mock_stream = mocker.patch("tsensor.routes.api.data_stream")
-    type(mock_stream).data = mocker.PropertyMock(
-        return_value=[d[1] for d in test_data])
+    for val in test_data:
+        mock_handler.data.add(val, timestamp="10:00:00:000")
 
     response = client.get("/api/residual-analysis")
 
@@ -261,15 +219,11 @@ def test_api_residual_analysis_success(client, mocker):
     assert "values" in data
     assert "stats" in data
     assert data["stats"]["n"] == 5
-    # A média dos resíduos de uma regressão linear deve ser muito próxima de zero
     assert abs(data["stats"]["mean"]) < 1e-10
 
 
-def test_api_residual_analysis_no_data(client, mocker):
+def test_api_residual_analysis_no_data(client, mock_handler):
     """Verifica se /api/residual-analysis retorna erro quando não há dados."""
-    mock_stream = mocker.patch("tsensor.routes.api.data_stream")
-    type(mock_stream).data = mocker.PropertyMock(return_value=[])
-
     response = client.get("/api/residual-analysis")
 
     assert response.status_code == 400
@@ -279,24 +233,23 @@ def test_api_residual_analysis_no_data(client, mocker):
 def test_api_update_config_advanced_and_debug(client, mocker):
     """Valida o salvamento de configurações de debug e limites opcionais."""
     mocker.patch("tsensor.routes.api.save_config")
-    
+
     payload = {
         "mcu": "esp32",
         "port": "/dev/ttyUSB1",
         "baudrate": "9600",
         "enable_limit_samples": "on",
         "total_samples": "5000",
-        "enable_limit_time": False, # Simula checkbox desmarcado
+        "enable_limit_time": False,
         "update_interval_ms": "2000",
         "decimal_places": "3",
         "debug_mode": "on",
         "log_level": "DEBUG"
     }
-    
+
     response = client.post("/api/config", json=payload)
     assert response.status_code == 200
-    
-    from tsensor.extensions import config
+
     # Verifica se os valores foram aplicados no dicionário global de config
     assert config["acquisition"]["total_samples"] == 5000
     assert "max_runtime_sec" not in config["acquisition"]

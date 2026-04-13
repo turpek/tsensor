@@ -1,35 +1,31 @@
 import threading
 from loguru import logger
-from tsensor.extensions import data_stream, buffer_stream, config
-from tsensor.core.handlers import HANDLERS, StreamManager
+from tsensor.extensions import manager, config, setup_manager
 from tsensor.core.serial_reader import serial_reading
 
 # Controle global da thread
 _acquisition_thread = None
-_current_manager = None
 _thread_lock = threading.Lock()
-
-TEMP_NAME = 'temperature'
 
 
 def stop_acquisition():
     """Para a thread de aquisição atual se estiver rodando."""
-    global _acquisition_thread, _current_manager
+    global _acquisition_thread
     with _thread_lock:
-        if _current_manager:
-            _current_manager.stop()
+        if manager:
+            manager.stop()
 
         if _acquisition_thread and _acquisition_thread.is_alive():
-            _acquisition_thread.join(timeout=2)
-            logger.info("Thread de aquisição interrompida.")
+            # Não damos join com timeout longo para não travar o Flask
+            # O manager.stop() já sinaliza a interrupção no serial_reader
+            logger.info("Sinalizando parada para a thread de aquisição.")
 
         _acquisition_thread = None
-        _current_manager = None
 
 
 def start_acquisition():
     """Inicia ou reinicia a thread de aquisição serial se não estiver rodando."""
-    global _acquisition_thread, _current_manager
+    global _acquisition_thread
 
     with _thread_lock:
         if _acquisition_thread and _acquisition_thread.is_alive():
@@ -38,21 +34,10 @@ def start_acquisition():
             )
             return
 
-        def run(manager):
+        def run():
             try:
-                sensor_type = config["sensor"]["type"]
-                if sensor_type not in HANDLERS:
-                    logger.error(f"Tipo de sensor desconhecido: {sensor_type}")
-                    return
-
-                handler_cls = HANDLERS[sensor_type]
-
-                manager.add_handler(
-                    TEMP_NAME,
-                    handler_cls,
-                    data_stream,
-                    buffer_stream,
-                )
+                # Configura o manager global com base no TOML atualizado
+                setup_manager(config)
 
                 logger.info(
                     f"Iniciando tentativa de conexão em {config['hardware']['port']}..."
@@ -60,26 +45,17 @@ def start_acquisition():
                 serial_reading(
                     port=config["hardware"]["port"],
                     baudrate=config["hardware"]["baudrate"],
-                    samples=config["acquisition"]["total_samples"],
                     stream_manager=manager,
-                    timeout=config["hardware"]["timeout"],
+                    # O serial_reading deve ler o timeout da config hardware
+                    timeout=config["hardware"].get("timeout", 1.0),
                 )
             except Exception as e:
                 logger.error(f"Erro crítico na thread de aquisição: {e}")
             finally:
-                global _current_manager
-                _current_manager = None
-
-        _current_manager = StreamManager(
-            samples=config["acquisition"].get("total_samples", 1000000), # Amostras por handler (buffer circular)
-            timeout=config["acquisition"].get("max_runtime_sec"),        # Limite de tempo da sessão
-            adc_max=config["sensor"]["adc_max"],
-            v_ref=config["sensor"]["v_ref"],
-            total_samples=config["acquisition"].get("total_samples"),    # Limite global de amostras
-        )
+                logger.info("Thread de aquisição finalizada.")
 
         _acquisition_thread = threading.Thread(
-            target=run, args=(_current_manager,), daemon=True,
+            target=run, daemon=True,
         )
         _acquisition_thread.start()
         logger.info("Thread de aquisição disparada com sucesso.")

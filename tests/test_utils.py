@@ -1,7 +1,4 @@
 import numpy as np
-from tsensor.core.utils import detrend
-
-
 from tsensor.core.utils import detrend, histogram, Stat
 
 
