@@ -1,5 +1,5 @@
 import numpy as np
-from tsensor.core.utils import detrend, histogram, Stat
+from tsensor.core.utils import detrend, histogram, Stat, numpy_histogram, hybrid_histogram
 
 
 def test_stat_initialization():
@@ -197,14 +197,12 @@ def test_residuals_with_noise():
 
 def test_numpy_histogram_empty():
     """Deve retornar dict vazio para entrada vazia."""
-    from tsensor.core.utils import numpy_histogram
     res = numpy_histogram(np.array([]))
     assert res == {}
 
 
 def test_numpy_histogram_limit_bins():
     """Deve limitar o número de bins a no máximo 15."""
-    from tsensor.core.utils import numpy_histogram
     # 5000 amostras normalmente gerariam muito mais que 15 bins com 'auto'
     samples = np.random.normal(loc=10, scale=1, size=5000)
     res = numpy_histogram(samples)
@@ -214,7 +212,6 @@ def test_numpy_histogram_limit_bins():
 
 def test_hybrid_histogram_prefers_numpy_when_small():
     """Deve usar NumPy se o número de bins for pequeno (<= 10)."""
-    from tsensor.core.utils import hybrid_histogram
     # Poucos dados -> NumPy deve gerar poucos bins
     samples = np.array([1.0, 1.1, 1.2, 1.3, 1.4])
     res = hybrid_histogram(samples, 0.4, 1.2, 0.1)
@@ -224,8 +221,6 @@ def test_hybrid_histogram_prefers_numpy_when_small():
 
 def test_hybrid_histogram_prefers_classic_when_numpy_is_dense():
     """Deve preferir o algoritmo clássico se ele resultar em menos bins que o NumPy (quando NumPy > 10)."""
-    from tsensor.core.utils import hybrid_histogram, numpy_histogram, histogram
-
     # Gerar dados que forçam o NumPy a gerar 15 bins
     samples = np.random.normal(loc=25, scale=5, size=5000)
 
@@ -240,3 +235,24 @@ def test_hybrid_histogram_prefers_classic_when_numpy_is_dense():
     else:
         # Caso contrário (ou se NumPy < 10), deve ser o NumPy
         assert len(res_hybrid) == len(res_np)
+
+
+def test_hybrid_histogram_avoids_too_few_classic_bins():
+    """Verifica se a função híbrida evita usar o clássico quando este resulta em <= 2 bins."""
+    # Dados que forçam o NumPy a gerar 15 bins
+    samples = np.random.normal(loc=25, scale=5, size=5000)
+
+    # Forçamos uma resolução ADC muito alta para o algoritmo clássico colapsar em 1 ou 2 bins
+    # O Freedman-Diaconis vai usar max(h_fd, resolucao_adc)
+    res_np = numpy_histogram(samples, decimals=1)  # terá 15 bins
+
+    # Resolução gigante para forçar poucos bins no clássico
+    resolucao_gigante = 50.0
+    res_classic = histogram(samples, 40.0, 25.0, resolucao_gigante, 1)
+
+    assert len(res_classic) <= 2
+
+    res_hybrid = hybrid_histogram(samples, 40.0, 25.0, resolucao_gigante, 1)
+
+    # Mesmo que len(res_classic) < len(res_np), o híbrido deve recusar o clássico por ter bins insuficientes
+    assert len(res_hybrid) == len(res_np)
