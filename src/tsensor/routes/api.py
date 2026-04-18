@@ -8,10 +8,20 @@ import numpy as np
 from flask import Blueprint, render_template, jsonify, request
 from tsensor.extensions import manager, config, app_status
 from tsensor.core.utils import save_config, detrend, Stat, hybrid_histogram
-from tsensor.core.acquisition import start_acquisition, stop_acquisition
+from tsensor.core.acquisition import start_acquisition, stop_acquisition, start_serial
 from tsensor.core.exporters import CSVExporter
 
 api_route = Blueprint("api", __name__, url_prefix="/api")
+
+
+@api_route.route("/start-serial", methods=["POST"])
+def start_serial_route():
+    """Ativa a aquisição via porta serial em tempo real."""
+    try:
+        start_serial()
+        return jsonify({"success": True, "message": "Modo Tempo Real ativado."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 def _get_main_handler():
@@ -36,8 +46,8 @@ def get_residual_analysis():
     if not handler:
         return jsonify({"error": "Sensor não encontrado ou não configurado."}), 400
 
-    temps = handler.data.data
-    if not temps:
+    temps = handler.data.samples
+    if temps.size == 0:
         return jsonify({"error": "Não há dados para análise."}), 400
 
     # Extrai apenas as temperaturas e aplica detrend
@@ -77,7 +87,8 @@ def export_data():
         sensor_names = list(manager._handlers.keys())
 
         for name in sensor_names:
-            samples = manager._handlers[name].data.sample
+            ds = manager._handlers[name].data
+            samples = list(zip(ds.timestamp, ds.samples))
             sensor_data[name] = samples
             if len(samples) > max_len:
                 max_len = len(samples)
@@ -177,6 +188,10 @@ def update_config():
     else:
         config["acquisition"].pop("max_runtime_sec", None)
 
+    if "serial_batch_size" in data:
+        config["acquisition"]["serial_batch_size"] = int(
+            data["serial_batch_size"])
+
     config["presentation"]["update_interval_ms"] = int(
         data.get("update_interval_ms",
                  config["presentation"]["update_interval_ms"])
@@ -258,7 +273,7 @@ def get_histogram():
         # Só move para o histórico (time_series) se o buffer atingiu o limite configurado (is_full)
         if buffer.is_full:
             # Extrai o timestamp da última amostra do buffer
-            last_ts = buffer.sample[-1][0] if buffer.sample else None
+            last_ts = buffer.timestamp[-1] if buffer.timestamp else None
             # Adiciona a média do bloco ao histórico temporal
             handler.time_series.add(buffer.mean, timestamp=last_ts)
             # Limpa o buffer para o próximo bloco
@@ -267,13 +282,31 @@ def get_histogram():
         ds = handler.data
         hist_dict = ds.histogram(resolucao_adc=0.01, decimal_label=4)
 
+        # Análise Residual (Detrended) para o dashboard
+        temps = ds.samples
+        if temps.size > 1:
+            res_samples = detrend(temps)
+            res_stat = Stat(total_samples=len(res_samples), initial_data=res_samples)
+            res_hist = hybrid_histogram(
+                np.array(res_samples), res_stat.amplitude, res_stat.mean, 
+                resolucao_adc=0.01, decimal_label=6
+            )
+            residual_data = {
+                "labels": list(res_hist.keys()),
+                "values": list(res_hist.values()),
+                "std": res_stat.std
+            }
+        else:
+            residual_data = {"labels": [], "values": [], "std": 0}
+
         all_histograms[name] = {
-            "labels": [s[0] for s in handler.time_series.sample],
-            "values": [s[1] for s in handler.time_series.sample],
+            "labels": list(handler.time_series.timestamp),
+            "values": list(handler.time_series.samples),
             "histogram": {
                 "labels": list(hist_dict.keys()),
                 "values": list(hist_dict.values()),
             },
+            "residual": residual_data,
             "stats": {
                 "n": len(ds),
                 "mean": ds.mean,
@@ -312,7 +345,8 @@ def download_charts_zip():
             unit = units.get(s_type, "")
 
             # 1. Gráfico de Série Temporal (Suavizado com Spline)
-            data_points = handler.time_series.sample
+            data_points = list(
+                zip(handler.time_series.timestamp, handler.time_series.samples))
             if data_points:
                 labels = [p[0] for p in data_points]
                 values = np.array([p[1] for p in data_points])
@@ -357,7 +391,7 @@ def download_charts_zip():
                     f"serie_temporal_{safe_name}_{timestamp}.png", img_io.getvalue())
 
             # 2. Histograma Global
-            data_raw = np.array(handler.data.data)
+            data_raw = np.array(handler.data.samples)
             if len(data_raw) > 0:
                 plt.figure(figsize=(10, 6), dpi=100)
                 plt.hist(data_raw, bins="auto", color="#3b82f6",
@@ -377,7 +411,7 @@ def download_charts_zip():
 
             # 3. Gráfico de Resíduos (Detrended)
             if len(data_raw) > 1:
-                residuals = detrend(handler.data.data)
+                residuals = detrend(handler.data.samples)
                 plt.figure(figsize=(10, 6), dpi=100)
                 plt.hist(residuals, bins="auto", color="#818cf8",
                          alpha=0.7, edgecolor="white")

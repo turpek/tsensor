@@ -2,9 +2,10 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from loguru import logger
 # from googleapiclient.errors import HttpError
 from tsensor.core.exporters import DataExporter
-from typing import Any
+from typing import Any, Optional
 from pathlib import Path
 
 
@@ -62,6 +63,26 @@ class SpreadSheetRange:
 
         return f"{start_cell}:{e_letter}{self._end_row}"
 
+    @property
+    def current_rows(self) -> int:
+        """Retorna a quantidade de linhas no intervalo atual."""
+        return (self._end_row - self._row) + 1
+
+    def revert_rows(self, unread_rows: int) -> None:
+        """
+        Retrai o final do intervalo descartando as linhas não lidas.
+        Utilizado para compensar leituras que atingiram o final da planilha (EOF),
+        garantindo que a próxima leitura inicie logo após a última linha válida.
+        """
+        if unread_rows <= 0:
+            return
+
+        self._end_row -= unread_rows
+
+        # Garante que o cursor final não fique antes do início
+        if self._end_row < 0:
+            self._end_row = 0
+
     def clear(self, row: int = 1, col: int = 1) -> None:
         """Reseta o cursor para uma nova posição inicial."""
         self._row = row
@@ -84,7 +105,7 @@ class SheetsManager(DataExporter):
         self._credentials_path = Path(credentials_path)
         self._token_path = Path(token_path)
 
-    def setup(self) -> Any:
+    def setup(self, row_count: Optional[int] = None, col_count: Optional[int] = None, sheet_name: str = 'Página1') -> Any:
 
         creds = None
         if self._token_path.exists():
@@ -96,7 +117,7 @@ class SheetsManager(DataExporter):
                 creds.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    str(self._token_path), SCOPES
+                    str(self._credentials_path), SCOPES
                 )
                 creds = flow.run_local_server(port=0)
 
@@ -105,7 +126,45 @@ class SheetsManager(DataExporter):
 
         self._service = build("sheets", "v4", credentials=creds)
         self._sheet = self._service.spreadsheets()
+
+        # Configura a grade inicial se solicitado
+        if row_count or col_count:
+            self._ensure_grid_size(
+                row_count or 1000, col_count or 3, sheet_name)
+
         return self._sheet
+
+    def _ensure_grid_size(self, rows: int, cols: int, sheet_name: str) -> None:
+        """Ajusta o tamanho da grade da planilha para os valores exatos."""
+        try:
+            spreadsheet = self._sheet.get(
+                spreadsheetId=SPREADSHEET_ID).execute()
+            sheet_id = None
+            for s in spreadsheet.get('sheets', []):
+                if s.get('properties', {}).get('title') == sheet_name:
+                    sheet_id = s.get('properties', {}).get('sheetId')
+                    break
+
+            if sheet_id is not None:
+                body = {
+                    'requests': [{
+                        'updateSheetProperties': {
+                            'properties': {
+                                'sheetId': sheet_id,
+                                'gridProperties': {
+                                    'rowCount': rows,
+                                    'columnCount': cols
+                                }
+                            },
+                            'fields': 'gridProperties(rowCount, columnCount)'
+                        }
+                    }]
+                }
+                self._sheet.batchUpdate(
+                    spreadsheetId=SPREADSHEET_ID, body=body).execute()
+        except Exception as e:
+            logger.warning(
+                f"Ajuste de grade falhou (provavelmente limite de 10M de células): {e}")
 
     def export(
         self,
@@ -126,11 +185,21 @@ class SheetsManager(DataExporter):
             'data': [datas]
         }
 
-        result = self._sheet.values().batchUpdate(
-            spreadsheetId=SPREADSHEET_ID,
-            body=body
-        ).execute()
-        return result
+        try:
+            return self._sheet.values().batchUpdate(
+                spreadsheetId=SPREADSHEET_ID,
+                body=body
+            ).execute()
+        except Exception as e:
+            # Se o erro for por limite de grade, tenta expandir e repetir
+            if "exceeds grid limits" in str(e):
+                self._ensure_grid_size(
+                    sheet_range._end_row, sheet_range._end_col, name)
+                return self._sheet.values().batchUpdate(
+                    spreadsheetId=SPREADSHEET_ID,
+                    body=body
+                ).execute()
+            raise e
 
     def fetch_data(
         self,
@@ -144,5 +213,40 @@ class SheetsManager(DataExporter):
             spreadsheetId=SPREADSHEET_ID,
             majorDimension=major_mode,
             ranges=[range_],
+            valueRenderOption='UNFORMATTED_VALUE',
+            dateTimeRenderOption='FORMATTED_STRING'
         ).execute()
         return result
+
+    def fetch_metadata(self, name: str = 'Página1') -> dict:
+        """Obtém metadados da planilha: total de linhas, colunas e o cabeçalho."""
+        # 1. Obtém propriedades da planilha (dimensões)
+        spreadsheet = self._sheet.get(spreadsheetId=SPREADSHEET_ID).execute()
+        sheets = spreadsheet.get('sheets', [])
+
+        meta = {"rowCount": 0, "columnCount": 0, "header": []}
+
+        for s in sheets:
+            props = s.get('properties', {})
+            if props.get('title') == name:
+                grid = props.get('gridProperties', {})
+                meta["rowCount"] = grid.get('rowCount', 0)
+                meta["columnCount"] = grid.get('columnCount', 0)
+                break
+
+        # 2. Obtém a primeira linha (cabeçalho)
+        header_result = self._sheet.values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f'{name}!1:1'
+        ).execute()
+
+        values = header_result.get('values', [])
+        meta["header"] = values[0] if values else []
+
+        self._metadata = meta
+        return meta
+
+    @property
+    def metadata(self) -> dict:
+        """Retorna os metadados cacheados da última execução de fetch_metadata."""
+        return getattr(self, '_metadata', {"rowCount": 0, "columnCount": 0, "header": []})

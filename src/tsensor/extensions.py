@@ -1,11 +1,57 @@
 from loguru import logger
 from tsensor.core.data_stream import DataStream
-from tsensor.core.handlers import StreamManager, HANDLERS
+from tsensor.core.handlers import StreamManager, HANDLERS, SheetsHandler
+from tsensor.core.sheets import SheetsManager, SpreadSheetRange
 from tsensor.core.utils import load_config
 
 # Carrega as configurações globais
 config = load_config()
 manager = StreamManager()
+
+# Instância e configuração global do SheetsManager
+sheet_manager = SheetsManager()
+# Expande a planilha conforme as amostras configuradas (+1 para cabeçalho) e 3 colunas (TS, Temp, Pres)
+total_samples = config["acquisition"].get("total_samples", 1000)
+sheet_manager.setup(row_count=total_samples + 1, col_count=3)
+sheet_range = SpreadSheetRange(row=2)
+
+
+def setup_serial_manager(config: dict) -> StreamManager:
+    """Configura um StreamManager local para aquisição Serial em lotes."""
+    serial_manager = StreamManager()
+
+    # Parâmetros para o modo Serial
+    batch_limit = config["acquisition"].get("serial_batch_size", 50)
+
+    serial_manager.configure(
+        timeout=config["acquisition"].get("max_runtime_sec"),
+        total_samples=None,  # O controle de parada será externo ou via is_active global
+    )
+
+    for sensor in config.get('sensors', []):
+        sensor_model = sensor.get("model")
+        if sensor_model not in HANDLERS:
+            continue
+
+        # DataStream principal tem o tamanho do lote de exportação
+        data_stream = DataStream(total_samples=batch_limit)
+        # Buffers de tempo real têm tamanho 1 (apenas a última amostra)
+        data_buffer = DataStream(total_samples=1)
+        time_series = DataStream(total_samples=1)
+
+        kwargs = sensor.get('calibration', {})
+        name = sensor.get('name')
+
+        handler = HANDLERS[sensor_model](
+            data=data_stream,
+            data_buffer=data_buffer,
+            time_series=time_series,
+            adc_max=kwargs.get('adc_max', 4095),
+            v_ref=kwargs.get('v_ref', 3.3)
+        )
+        serial_manager.add_handler(name, handler)
+
+    return serial_manager
 
 
 def setup_manager(config: dict) -> StreamManager:
@@ -29,10 +75,17 @@ def setup_manager(config: dict) -> StreamManager:
         data_buffer = DataStream(total_samples=buffer_limit)
         time_series = DataStream(total_samples=timeseries_limit)
 
-        cls_handler = HANDLERS.get(sensor_model)
         kwargs = sensor.get('calibration', {})
         name = sensor.get('name')
-        handler = cls_handler(data_stream, data_buffer, time_series, **kwargs)
+
+        handler = SheetsHandler(
+            data=data_stream,
+            data_buffer=data_buffer,
+            time_series=time_series,
+            name=name,
+            adc_max=kwargs.get('adc_max', 4095),
+            v_ref=kwargs.get('v_ref', 3.3)
+        )
         manager.add_handler(name, handler)
 
     if len(manager) == 0:

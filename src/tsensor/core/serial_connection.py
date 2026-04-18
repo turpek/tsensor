@@ -7,14 +7,14 @@ from serial import Serial as _RealSerial, SerialException
 # Tabela de referência: (mcu, vref) -> targets de ADC
 SIM_DATA = {
     ("esp32", 3.3): {
-        "P": 15358544,  # Alvo: 0.5 kPa
+        "P": 93556,
         "LM35": 310,
         "NTC": 2047,
         "sigma_t": 2,
-        "sigma_p": 500
+        "sigma_p": 150
     },
     ("arduino_uno", 5.0): {
-        "P": 11162548,  # Alvo: 2.0 kPa
+        "P": 93556,
         "LM35": 51,
         "NTC": 511,
         "sigma_t": 1,
@@ -52,7 +52,7 @@ class VirtualSerial:
 
         # Seleciona os targets da tabela ou usa default (ESP32)
         self.targets = SIM_DATA.get((mcu, vref), DEFAULT_TARGETS)
-        self.active_models = [s["model"] for s in config["sensors"]]
+        self.active_models = [s["model"] for s in config.get("sensors", [])]
 
         # Carrega latência configurada (Padrão 100ms se ausente)
         latency_us = config["hardware"].get("simulation_latency_us", 100000)
@@ -65,23 +65,28 @@ class VirtualSerial:
         """Gera dados simulados com ruído gaussiano baseado no hardware configurado."""
         time.sleep(self.latency)
 
-        # Decide qual prefixo enviar (T ou P)
-        prefix = random.choice(["T", "P"])
+        results = []
 
-        if prefix == "T":
-            # Escolhe o alvo baseado no modelo de temperatura presente na config
-            if "NTC" in self.active_models:
-                target = self.targets["NTC"]
-            else:
-                target = self.targets["LM35"]
-            val = int(random.gauss(target, self.targets["sigma_t"]))
-        else:
-            # Pressão (MPS20 / HX710B)
+        # Temperatura (T)
+        if any(m in self.active_models for m in ["NTC", "LM35"]):
+            target = self.targets["NTC"] if "NTC" in self.active_models else self.targets["LM35"]
+            val_t = int(random.gauss(target, self.targets["sigma_t"]))
+            results.append(f"T={max(0, val_t)}")
+
+        # Pressão (P)
+        if "MPS20N0040D" in self.active_models:
             target = self.targets["P"]
-            val = int(random.gauss(target, self.targets["sigma_p"]))
+            val_p = int(random.gauss(target, self.targets["sigma_p"]))
+            results.append(f"P={max(0, val_p)}")
 
-        val = max(0, val)
-        return f"{prefix}={val}\n".encode()
+        # Se nenhum sensor for identificado (fallback), envia algo aleatório
+        if not results:
+            prefix = random.choice(["T", "P"])
+            target = self.targets["NTC"] if prefix == "T" else self.targets["P"]
+            val = int(random.gauss(target, 1))
+            return f"{prefix}={max(0, val)}\n".encode()
+
+        return (",".join(results) + "\n").encode()
 
     def close(self):
         self.is_open = False

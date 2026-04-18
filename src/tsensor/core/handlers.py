@@ -24,7 +24,7 @@ class SerialHandler(Protocol):
     ):
         ...
 
-    def handle(self, line: str) -> bool:
+    def handle(self, line: str | float) -> bool:
         ...
 
     @property
@@ -40,6 +40,42 @@ class SerialHandler(Protocol):
         ...
 
 
+class SheetsHandler:
+
+    def __init__(
+        self,
+        data: DataStream,
+        data_buffer: DataStream,
+        time_series: DataStream,
+        name: str,
+        adc_max: int,
+        v_ref: float,
+    ):
+        self._data = data
+        self._data_buffer = data_buffer
+        self._time_series = time_series
+        self._name = name
+
+    def handle(self, line: str, timestamp: str = '') -> bool:
+        line = float(line)
+        logger.debug(f"{self._name}: {line:.4f}")
+        self._data.add(line, timestamp)
+        self._data_buffer.add(line, timestamp)
+        return True
+
+    @property
+    def data_buffer(self) -> DataStream:
+        return self._data_buffer
+
+    @property
+    def data(self) -> DataStream:
+        return self._data
+
+    @property
+    def time_series(self) -> DataStream:
+        return self._time_series
+
+
 class PressureHandler(ABC):
     def __init__(
         self,
@@ -49,7 +85,7 @@ class PressureHandler(ABC):
         adc_max: int,
         v_ref: float,
         offset: float = 22.6,
-        sensitivity: float = 1.6949
+        sensitivity: float = 1.25
     ):
         self._data = data
         self._data_buffer = data_buffer
@@ -182,7 +218,7 @@ class MPS20Handler(PressureHandler):
         adc_max = 2 ** 24
         v_ref_milli = self._v_ref * 1000
         v_sensor_mv = (adc * v_ref_milli) / (B * adc_max)
-        press = (v_sensor_mv - self._offset) / self._sensitivity
+        press = (v_sensor_mv) / self._sensitivity
         return round(press, 4)
 
 
@@ -221,6 +257,14 @@ class StreamManager:
         counts = [self._count]
         for handler in self._handlers.values():
             handler.handle(line)
+            counts.append(len(handler.data))
+        self._count = max(counts)
+
+    def dispatch_sheets(self, line: str) -> None:
+        counts = [self._count]
+        ts = line[0]
+        for handler, col in zip(self._handlers.values(), line[1:]):
+            handler.handle(col, ts)
             counts.append(len(handler.data))
         self._count = max(counts)
 

@@ -11,42 +11,43 @@ def test_virtual_serial_readline_format(mocker):
 
     assert isinstance(line, bytes)
     decoded = line.decode().strip()
-    assert decoded.startswith(("T=", "P="))
+    # Agora pode começar com T= ou P= (dependendo de qual sensor vem primeiro na lista)
+    assert any(decoded.startswith(p) for p in ["T=", "P="])
     assert line.endswith(b"\n")
 
 
 def test_virtual_serial_values_within_range(mocker):
     """Valida se os valores gerados estão coerentes com a tabela de hardware (ESP32)."""
     mocker.patch("time.sleep")  # Acelera o teste
-    # Mock da config para garantir que o init use ESP32
+
+    # Mock da config com DOIS sensores ativos para testar o novo formato T=NUM,P=NUM
     mock_config = {
-        "hardware": {"mcu": "esp32"},
-        "sensors": [{"model": "LM35", "calibration": {"v_ref": 3.3}}],
+        "hardware": {"mcu": "esp32", "simulation_latency_us": 100},
+        "sensors": [
+            {"name": "Temp", "model": "LM35", "calibration": {"v_ref": 3.3}},
+            {"name": "Pres", "model": "MPS20N0040D", "calibration": {"v_ref": 3.3}}
+        ],
         "acquisition": {"max_runtime_sec": 1800, "total_samples": 1000000}
     }
-    mocker.patch("tsensor.extensions.config", mock_config)
+    mocker.patch.dict("tsensor.extensions.config", mock_config, clear=True)
 
     v_serial = VirtualSerial("SIM", 115200)
 
-    # Coleta 20 amostras para garantir que pegamos ambos os prefixos
-    samples = [v_serial.readline().decode().strip() for _ in range(20)]
+    # Coleta 5 amostras. No novo formato, cada linha deve ter T=... E P=...
+    samples = [v_serial.readline().decode().strip() for _ in range(5)]
 
-    t_values = [int(s[2:]) for s in samples if s.startswith("T=")]
-    p_values = [int(s[2:]) for s in samples if s.startswith("P=")]
+    for line in samples:
+        assert "T=" in line
+        assert "P=" in line
+        assert "," in line
 
-    # Verifica se gerou ambos os tipos
-    assert len(t_values) > 0
-    assert len(p_values) > 0
+        # Parsing robusto do novo formato T=NUM,P=NUM
+        parts = {p.split("=")[0]: int(p.split("=")[1])
+                 for p in line.split(",")}
 
-    # No ESP32 @ 3.3V: T (LM35) ~ 310, P ~ 14.707.010
-    # Usamos uma margem generosa de 10 sigmas para evitar falhas randômicas em testes
-    if t_values:
-        for v in t_values:
-            assert 200 < v < 400  # Em torno de 310
-
-    if p_values:
-        for v in p_values:
-            assert 11000000 < v < 16000000  # Cobre alvos de 0.5 kPa e 2.0 kPa
+        # Verifica ranges do ESP32 (LM35 ~310, MPS20 ~93556)
+        assert 200 < parts["T"] < 400
+        assert 90000 < parts["P"] < 96000
 
 
 def test_serial_factory_selection(mocker):

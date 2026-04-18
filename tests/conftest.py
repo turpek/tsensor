@@ -1,5 +1,12 @@
-import pytest
 from tsensor.app import app
+import pytest
+from unittest import mock
+
+# --- MOCK GLOBAL DE SEGURANÇA NO IMPORT TIME ---
+# tsensor.extensions instancia o SheetsManager globalmente
+from tsensor.core.sheets import SheetsManager
+original_sheets_setup = SheetsManager.setup
+SheetsManager.setup = mock.MagicMock()
 
 
 @pytest.fixture(autouse=True)

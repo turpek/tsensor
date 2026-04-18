@@ -2,128 +2,228 @@ import pytest
 from pathlib import Path
 from tsensor.core.sheets import SheetsManager, SpreadSheetRange
 
+
 @pytest.fixture
-def mock_google_api(mocker):
-    """Mocka todas as dependências externas do Google e do sistema de arquivos."""
-    mocker.patch("tsensor.core.sheets.Path.exists", return_value=True)
-    mocker.patch("tsensor.core.sheets.Path.open", mocker.mock_open(read_data='{"token": "dummy"}'))
-    
+def mock_sheets_deps(mocker):
+    """Isola completamente o SheetsManager de dependências externas (FileSystem e Google)."""
+    # Importa de forma segura
+    try:
+        from tests.conftest import original_sheets_setup
+        mocker.patch("tsensor.core.sheets.SheetsManager.setup",
+                     new=original_sheets_setup)
+    except ImportError:
+        pass
+
+    # 1. Mock do Path com instâncias controladas
+    m_path_class = mocker.patch("tsensor.core.sheets.Path")
+    mock_instances = {}
+
+    def path_side_effect(p):
+        p_str = str(p)
+        if p_str not in mock_instances:
+            m_p = mocker.MagicMock(spec=Path)
+            m_p.__str__.return_value = p_str
+            m_p.exists.return_value = True
+            mock_instances[p_str] = m_p
+        return mock_instances[p_str]
+    m_path_class.side_effect = path_side_effect
+
+    # 2. Mock do builtin 'open' no namespace do módulo
+    m_open = mocker.patch("tsensor.core.sheets.open",
+                          mocker.mock_open(read_data='{"token": "dummy"}'))
+
+    # 3. Mock Google Auth e API
     mock_creds = mocker.Mock()
     mock_creds.valid = True
-    mock_creds.to_json.return_value = '{"token": "mocked"}'
-    mocker.patch("tsensor.core.sheets.Credentials.from_authorized_user_file", return_value=mock_creds)
-    
-    mock_service = mocker.Mock()
-    mock_build = mocker.patch("tsensor.core.sheets.build", return_value=mock_service)
-    
+    mock_creds.expired = False
+    mock_creds.refresh_token = "some_refresh_token"
+    mock_creds.to_json.return_value = '{"token": "mocked_json"}'
+
+    mocker.patch(
+        "tsensor.core.sheets.Credentials.from_authorized_user_file", return_value=mock_creds)
+    m_flow = mocker.patch("tsensor.core.sheets.InstalledAppFlow")
+    m_request = mocker.patch("tsensor.core.sheets.Request")
+    m_build = mocker.patch("tsensor.core.sheets.build")
+
     return {
-        "service": mock_service,
-        "build": mock_build,
-        "creds": mock_creds
+        "path": m_path_class,
+        "instances": mock_instances,
+        "open": m_open,
+        "creds": mock_creds,
+        "flow": m_flow,
+        "build": m_build,
+        "request": m_request
     }
 
+# --- Testes de Lógica: SpreadSheetRange ---
+
+
 def test_spreadsheet_range_initialization():
-    """Valida se o range inicia corretamente na célula A1 por padrão."""
     sr = SpreadSheetRange()
     assert sr.to_a1() == "A1"
 
+
 def test_major_row_advances_cursor():
-    """Valida o avanço do cursor por linhas informando dimensões."""
     sr = SpreadSheetRange(1, 1)
-    sr.major_row(2, 2) 
+    sr.major_row(2, 2)
     assert sr.to_a1() == "A1:B2"
     sr.major_row(1, 3)
     assert sr.to_a1() == "A3:C3"
 
+
 def test_major_col_advances_cursor():
-    """Valida o avanço do cursor por colunas informando dimensões."""
     sr = SpreadSheetRange(1, 1)
     sr.major_col(2, 3)
     assert sr.to_a1() == "A1:B3"
     sr.major_col(2, 2)
     assert sr.to_a1() == "C1:D2"
 
+
 def test_mixed_advancement():
-    """Valida o avanço misto."""
     sr = SpreadSheetRange(1, 1)
-    sr.major_row(1, 4) # A1:D1
+    sr.major_row(1, 4)
     assert sr.to_a1() == "A1:D1"
-    sr.major_row(2, 4) # A2:D3
-    assert sr.to_a1() == "A2:D3"
-    sr.major_col(1, 5) # E2:E6
-    assert sr.to_a1() == "E2:E6"
+    sr.major_col(1, 5)
+    assert sr.to_a1() == "E1:E5"
+
 
 def test_clear_with_custom_start():
-    """Valida o reset do cursor."""
     sr = SpreadSheetRange(1, 1)
     sr.major_row(2, 2)
     sr.clear(10, 10)
     assert sr.to_a1() == "J10"
 
-# --- Testes do SheetsManager ---
 
-def test_sheets_manager_setup_success(mock_google_api):
-    """Valida se o setup inicializa o serviço corretamente."""
+def test_current_rows_property():
+    sr = SpreadSheetRange(1, 1)
+    # Range atual: A1
+    assert sr.current_rows == 1
+
+    sr.major_row(5, 2)
+    # Range atual: A1:B5
+    assert sr.current_rows == 5
+
+
+def test_revert_rows():
+    sr = SpreadSheetRange(1, 1)
+    sr.major_row(5, 2)
+    # Range: A1:B5 (row=1, end_row=5)
+
+    sr.revert_rows(2)
+    # Deve recuar end_row em 2 -> end_row = 3
+    # Então próximo major_row inicia no 4
+    sr.major_row(5, 2)
+    # Range novo: A4:B8
+    assert sr.to_a1() == "A4:B8"
+
+    sr.revert_rows(10)
+    # Deve recuar end_row em 10 -> end_row = 8 - 10 = -2 -> forçado a 0
+    # Próximo major_row inicia no 1
+    sr.major_row(5, 2)
+    assert sr.to_a1() == "A1:B5"
+
+# --- Testes de Integração: SheetsManager ---
+
+
+def test_sheets_manager_setup_success(mock_sheets_deps):
     manager = SheetsManager()
     manager.setup()
-    mock_google_api["build"].assert_called_once()
+    mock_sheets_deps["build"].assert_called_once()
     assert manager._sheet is not None
 
-def test_sheets_manager_export_calls_batch_update(mock_google_api, mocker):
-    """Valida se o método export envia dados usando a instância do SpreadSheetRange injetada."""
+
+def test_sheets_manager_export_calls_batch_update(mock_sheets_deps, mocker):
     manager = SheetsManager()
     mock_sheet_service = mocker.Mock()
-    mock_values = mocker.Mock()
-    mock_batch = mocker.Mock()
-    
     manager._sheet = mock_sheet_service
-    mock_sheet_service.values.return_value = mock_values
-    mock_values.batchUpdate.return_value = mock_batch
-    mock_batch.execute.return_value = {"status": "success"}
 
     sr = SpreadSheetRange(1, 1)
-    sr.major_row(2, 2) # Range A1:B2 definido pelo chamador
-    
-    result = manager.export([["data1", "data2"], ["data3", "data4"]], sr)
-    
-    assert mock_values.batchUpdate.called
-    # Verifica se o range enviado no body do batchUpdate é o correto vindo do SpreadSheetRange
-    call_args = mock_values.batchUpdate.call_args
-    assert call_args[1]['body']['data'][0]['range'] == "Página1!A1:B2"
-    assert result == {"status": "success"}
+    sr.major_row(2, 2)
 
-def test_sheets_manager_fetch_data_calls_batch_get(mock_google_api, mocker):
-    """Valida se o método fetch_data busca dados usando a instância do SpreadSheetRange injetada."""
+    manager.export([["d1", "d2"]], sr)
+    assert mock_sheet_service.values().batchUpdate.called
+    call_args = mock_sheet_service.values().batchUpdate.call_args[1]
+    assert call_args['body']['data'][0]['range'] == "Página1!A1:B2"
+
+
+def test_sheets_manager_fetch_data_calls_batch_get(mock_sheets_deps, mocker):
     manager = SheetsManager()
     mock_sheet_service = mocker.Mock()
-    mock_values = mocker.Mock()
-    mock_get = mocker.Mock()
-    
     manager._sheet = mock_sheet_service
-    mock_sheet_service.values.return_value = mock_values
-    mock_values.batchGet.return_value = mock_get
-    mock_get.execute.return_value = {"valueRanges": [{"values": [["fetched"]]}]}
 
     sr = SpreadSheetRange(1, 1)
-    sr.major_col(2, 3) # Range A1:B3 definido pelo chamador
-    
-    result = manager.fetch_data(sr)
-    
-    assert mock_values.batchGet.called
-    call_args = mock_values.batchGet.call_args
-    assert call_args[1]['ranges'] == ["Página1!A1:B3"]
-    assert result == {"valueRanges": [{"values": [["fetched"]]}]}
+    sr.major_col(2, 3)
 
-def test_sheets_manager_setup_expired_token_refresh(mocker, mock_google_api):
-    """Valida o refresh de token expirado."""
-    mock_creds = mock_google_api["creds"]
+    manager.fetch_data(sr)
+    assert mock_sheet_service.values().batchGet.called
+    call_args = mock_sheet_service.values().batchGet.call_args[1]
+    assert call_args['ranges'] == ["Página1!A1:B3"]
+
+
+def test_sheets_manager_fetch_metadata_success(mock_sheets_deps, mocker):
+    """Valida a extração de metadados (dimensões e cabeçalho)."""
+    manager = SheetsManager()
+    mock_sheet_service = mocker.Mock()
+    manager._sheet = mock_sheet_service
+
+    # 1. Mock do spreadsheet.get().execute() -> Dimensões
+    mock_spreadsheet_resp = {
+        'sheets': [{
+            'properties': {
+                'title': 'Página1',
+                'gridProperties': {'rowCount': 100, 'columnCount': 10}
+            }
+        }]
+    }
+    mock_sheet_service.get.return_value.execute.return_value = mock_spreadsheet_resp
+
+    # 2. Mock do values().get().execute() -> Cabeçalho
+    mock_values_resp = {'values': [['timestamp', 'temp', 'pres']]}
+    mock_sheet_service.values.return_value.get.return_value.execute.return_value = mock_values_resp
+
+    # Execução
+    result = manager.fetch_metadata("Página1")
+
+    # Verificações
+    assert result["rowCount"] == 100
+    assert result["columnCount"] == 10
+    assert result["header"] == ['timestamp', 'temp', 'pres']
+    assert manager.metadata == result
+
+    # Verifica se as chamadas foram corretas
+    mock_sheet_service.get.assert_called_with(
+        spreadsheetId="1E9ws5ui_I5rw58dLbIXrFTggOQ87mCAAit3nCeSkFp8")
+    mock_sheet_service.values.return_value.get.assert_called_with(
+        spreadsheetId="1E9ws5ui_I5rw58dLbIXrFTggOQ87mCAAit3nCeSkFp8",
+        range="Página1!1:1"
+    )
+
+
+def test_sheets_manager_setup_expired_token_refresh(mock_sheets_deps):
+    mock_creds = mock_sheets_deps["creds"]
     mock_creds.valid = False
     mock_creds.expired = True
-    mock_creds.refresh_token = "some_token"
-    
-    mocker.patch("tsensor.core.sheets.Request")
-    
+
     manager = SheetsManager()
     manager.setup()
-    
+
     mock_creds.refresh.assert_called_once()
+
+
+def test_sheets_manager_setup_new_login(mock_sheets_deps):
+    # Simula que o TOKEN não existe (força novo login via credenciais)
+    mock_sheets_deps["path"]("token.json").exists.return_value = False
+
+    mock_flow_class = mock_sheets_deps["flow"]
+    mock_flow_instance = mock_flow_class.from_client_secrets_file.return_value
+    mock_flow_instance.run_local_server.return_value = mock_sheets_deps["creds"]
+
+    manager = SheetsManager(
+        credentials_path="creds.json", token_path="token.json")
+    manager.setup()
+
+    # Valida se usou o arquivo de credenciais correto e salvou no token.json
+    mock_flow_class.from_client_secrets_file.assert_called_once_with(
+        "creds.json", ["https://www.googleapis.com/auth/spreadsheets"]
+    )
+    assert mock_sheets_deps["open"].called

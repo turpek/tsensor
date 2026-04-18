@@ -11,20 +11,22 @@ class DataStream(Stat):
         super().__init__(total_samples)
 
         self._lock = Lock()
-        self._data: deque[tuple[str, float]] = deque()
+        self._data: deque[float] = deque()
+        self._ts: deque[str] = deque()
 
     def __len__(self) -> int:
         return len(self._data)
 
     def _maintain_window(self) -> None | float:
         if self.is_full:
-            _, old_data = self._data.popleft()
+            old_data = self._data.popleft()
             return old_data
 
     def add(self, data: float, timestamp: str) -> None:
         with self._lock:
             old_data = self._maintain_window()
-            self._data.append((timestamp, data))
+            self._data.append(data)
+            self._ts.append(timestamp)
             self.update(data, old_data)
 
     def clear(self, total_samples: Optional[int] = None) -> None:
@@ -36,7 +38,7 @@ class DataStream(Stat):
         resolucao_adc: float,
         decimal_label: int = 1,
     ) -> dict[str, int]:
-        data = np.array([d for d in self.data])
+        data = np.array(self.samples)
         return hybrid_histogram(
             data,
             self.amplitude,
@@ -46,11 +48,11 @@ class DataStream(Stat):
         )
 
     @property
-    def sample(self) -> list:
+    def samples(self) -> np.ndarray:
         with self._lock:
-            return list(self._data)
+            return np.array(self._data)
 
     @property
-    def data(self) -> list:
+    def timestamp(self) -> list[str]:
         with self._lock:
-            return [d[1] for d in self._data]
+            return list(self._ts)

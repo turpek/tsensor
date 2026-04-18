@@ -8,12 +8,9 @@ def test_setup_manager_adds_multiple_handlers_correctly(mocker):
     Valida se o setup_manager cria e adiciona múltiplos handlers ao manager
     global baseando-se no dicionário de configuração.
     """
-    # 1. Mock do dicionário de HANDLERS para retornar classes mockadas
+    # 1. Mock do SheetsHandler que agora é usado por padrão
     mock_handler_cls = MagicMock()
-    mocker.patch("tsensor.extensions.HANDLERS", {
-        "LM35": mock_handler_cls,
-        "NTC": mock_handler_cls
-    })
+    mocker.patch("tsensor.extensions.SheetsHandler", mock_handler_cls)
 
     # 2. Mock do load_config não é necessário pois passamos o config via parâmetro
     test_config = {

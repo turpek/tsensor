@@ -31,7 +31,8 @@ def test_datastream_respeita_timestamp_manual(stream_vazia):
     ts = "12:34:56:789"
     stream_vazia.add(25.5, timestamp=ts)
 
-    ts_gravado, val = stream_vazia.sample[0]
+    ts_gravado = stream_vazia.timestamp[0]
+    val = stream_vazia.samples[0]
     assert ts_gravado == ts
     assert val == 25.5
 
