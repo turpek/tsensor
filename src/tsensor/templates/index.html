@@ -244,38 +244,6 @@
         </div>
     </div>
 
-    <!-- Modal Análise Residual (Com Seletor Dinâmico) -->
-    <div id="residual-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-        <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in duration-300">
-            <div class="p-5 flex justify-between items-center border-b border-slate-100 bg-slate-50">
-                <div class="flex items-center gap-4">
-                    <div>
-                        <h2 class="text-lg font-black text-slate-800 leading-tight">Análise Residual</h2>
-                        <p class="text-slate-500 text-[10px] font-medium italic">Dados Detrended</p>
-                    </div>
-                    {% if config.sensors|length > 1 %}
-                    <select id="residual-sensor-select" class="bg-white border border-slate-200 text-slate-700 text-[10px] font-bold uppercase rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500 shadow-sm cursor-pointer">
-                        {% for sensor in config.sensors %}
-                        <option value="{{ sensor.name }}">{{ sensor.name }} ({{ sensor.model }})</option>
-                        {% endfor %}
-                    </select>
-                    {% else %}
-                    <input type="hidden" id="residual-sensor-select" value="{{ config.sensors[0].name if config.sensors else '' }}">
-                    {% endif %}
-                </div>
-                <button onclick="document.getElementById('residual-overlay').classList.add('hidden')" class="text-slate-400 hover:text-slate-900 p-1.5 hover:bg-slate-100 rounded-full"><i class="bi bi-x-lg text-lg"></i></button>
-            </div>
-            <div class="p-6">
-                <div class="grid grid-cols-3 gap-4 mb-6 text-center">
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100"><h4 class="text-[9px] font-black text-slate-400 uppercase mb-0.5">Média</h4><p id="residual-mean" class="text-base font-bold text-indigo-600">-</p></div>
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100"><h4 class="text-[9px] font-black text-slate-400 uppercase mb-0.5">Ruído (σ)</h4><p id="residual-std" class="text-base font-bold text-blue-600">-</p></div>
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100"><h4 class="text-[9px] font-black text-slate-400 uppercase mb-0.5">Amostras</h4><p id="residual-n" class="text-base font-bold text-slate-700">-</p></div>
-                </div>
-                <div class="bg-white p-4 rounded-2xl border border-slate-100 h-[320px]"><canvas id="residualChart"></canvas></div>
-            </div>
-        </div>
-    </div>
-
     <!-- Navegação -->
     <nav class="bg-slate-900 text-white shadow-2xl mb-8">
         <div class="max-w-7xl mx-auto px-8 py-4 flex justify-between items-center">
@@ -284,7 +252,6 @@
                 <h1 class="text-xl font-black tracking-tighter">TSENSOR <span class="text-blue-500 text-xs font-normal uppercase tracking-[0.3em] ml-2 opacity-70">Lab</span></h1>
             </div>
             <div class="flex items-center gap-3 font-bold text-[11px] uppercase tracking-wider">
-                <button id="residual-btn" class="bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 px-4 py-2 rounded-xl transition-all border border-indigo-500/20 active:scale-95"><i class="bi bi-activity mr-2"></i>Análise</button>
                 <button id="save-charts-btn" class="bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 px-4 py-2 rounded-xl transition-all border border-emerald-500/20 active:scale-95"><i class="bi bi-download mr-2"></i>Salvar Gráficos</button>
                 <button id="start-serial-btn" class="bg-orange-600/10 hover:bg-orange-600/20 text-orange-500 px-4 py-2 rounded-xl transition-all border border-orange-500/20 active:scale-95"><i class="bi bi-lightning-charge-fill mr-2"></i>Tempo Real</button>
                 <button id="export-btn" class="bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 px-4 py-2 rounded-xl transition-all border border-blue-500/20 active:scale-95"><i class="bi bi-cloud-arrow-up mr-2"></i>Exportar</button>
@@ -334,8 +301,33 @@
                     <p id="max-{{ sensor.name|replace(' ', '-') }}" class="text-2xl font-black text-slate-700">-</p>
                 </div>
 
-                <div class="col-span-full mt-12 grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto w-full">
-                    <!-- Gráfico de Série Temporal -->
+                <div class="col-span-full mt-12 space-y-8 max-w-7xl mx-auto w-full">
+                    <!-- Linha Superior: Histogramas Lado a Lado -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Histograma Global -->
+                        <div class="space-y-4">
+                            <div class="flex items-center gap-2 ml-6">
+                                <div class="w-1.5 h-4 bg-blue-500 rounded-full"></div>
+                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Distribuição Real-Time (Histograma)</span>
+                            </div>
+                            <div class="bg-slate-50/50 rounded-[2.5rem] p-8 border border-slate-100 h-[350px] transition-all hover:bg-white hover:shadow-xl">
+                                <canvas id="canvas-{{ sensor.name|replace(' ', '-') }}"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Análise Residual (Ruído) -->
+                        <div class="space-y-4">
+                            <div class="flex items-center gap-2 ml-6">
+                                <div class="w-1.5 h-4 bg-orange-500 rounded-full"></div>
+                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Análise Residual (Ruído σ)</span>
+                            </div>
+                            <div class="bg-slate-50/50 rounded-[2.5rem] p-8 border border-slate-100 h-[350px] transition-all hover:bg-white hover:shadow-xl">
+                                <canvas id="residual-canvas-{{ sensor.name|replace(' ', '-') }}"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Linha Inferior: Série Temporal (Full Width) -->
                     <div class="space-y-4">
                         <div class="flex items-center gap-2 ml-6">
                             <div class="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
@@ -343,17 +335,6 @@
                         </div>
                         <div class="bg-slate-50/50 rounded-[2.5rem] p-8 border border-slate-100 h-[400px] transition-all hover:bg-white hover:shadow-xl">
                             <canvas id="time-canvas-{{ sensor.name|replace(' ', '-') }}"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Histograma Global -->
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-2 ml-6">
-                            <div class="w-1.5 h-4 bg-blue-500 rounded-full"></div>
-                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Distribuição Real-Time (Histograma)</span>
-                        </div>
-                        <div class="bg-slate-50/50 rounded-[2.5rem] p-8 border border-slate-100 h-[400px] transition-all hover:bg-white hover:shadow-xl">
-                            <canvas id="canvas-{{ sensor.name|replace(' ', '-') }}"></canvas>
                         </div>
                     </div>
                 </div>
@@ -376,7 +357,7 @@
     <script>
         let chartInstances = {}; // Histogramas
         let timeChartInstances = {}; // Séries Temporais
-        let residualChartInstance = null;
+        let residualChartInstances = {}; // Análise Residual
         let pollingIntervalId = null;
 
         function showToast(message, type = 'success') {
@@ -740,6 +721,43 @@
                                 });
                             }
                         }
+
+                        // 3. Atualiza Análise Residual (Bar Chart)
+                        const resCanvasEl = document.getElementById(`residual-canvas-${safeName}`);
+                        if (resCanvasEl && data.residual) {
+                            const ctx = resCanvasEl.getContext('2d');
+                            if (residualChartInstances[name]) {
+                                residualChartInstances[name].data.labels = data.residual.labels;
+                                residualChartInstances[name].data.datasets[0].data = data.residual.values;
+                                residualChartInstances[name].update('none');
+                            } else {
+                                residualChartInstances[name] = new Chart(ctx, {
+                                    type: 'bar',
+                                    data: { 
+                                        labels: data.residual.labels, 
+                                        datasets: [{ 
+                                            label: 'Ruído', 
+                                            data: data.residual.values, 
+                                            backgroundColor: 'rgba(249, 115, 22, 0.7)', 
+                                            borderRadius: 8 
+                                        }] 
+                                    },
+                                    options: { 
+                                        responsive: true, 
+                                        maintainAspectRatio: false, 
+                                        animation: false, 
+                                        plugins: { 
+                                            legend: { display: false },
+                                            tooltip: { callbacks: { label: (ctx) => `${ctx.raw} amostras` } }
+                                        }, 
+                                        scales: { 
+                                            y: { beginAtZero: true, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Freq', font: { size: 9 } } }, 
+                                            x: { grid: { display: false }, ticks: { font: { size: 8 } }, title: { display: true, text: `Desvio (${unit})`, font: { size: 9 } } } 
+                                        } 
+                                    }
+                                });
+                            }
+                        }
                     }
                 }
             }
@@ -952,20 +970,12 @@
             document.getElementById('open-setup').addEventListener('click', () => document.getElementById('setup-overlay').classList.remove('hidden'));
             document.getElementById('close-setup').addEventListener('click', () => document.getElementById('setup-overlay').classList.add('hidden'));
             
-            document.getElementById('residual-btn').addEventListener('click', openResidualAnalysis);
-            const rs = document.getElementById('residual-sensor-select');
-            if (rs) rs.addEventListener('change', openResidualAnalysis);
-
             document.addEventListener('keydown', (e) => {
                 const setupOverlay = document.getElementById('setup-overlay');
-                const residualOverlay = document.getElementById('residual-overlay');
                 if (e.key === 'Escape') {
                     if (!setupOverlay.classList.contains('hidden')) {
                         const closeBtn = document.getElementById('close-setup');
                         if (!closeBtn.classList.contains('hidden')) setupOverlay.classList.add('hidden');
-                    }
-                    if (!residualOverlay.classList.contains('hidden')) {
-                        residualOverlay.classList.add('hidden');
                     }
                 }
             });

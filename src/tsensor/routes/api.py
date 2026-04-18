@@ -282,6 +282,23 @@ def get_histogram():
         ds = handler.data
         hist_dict = ds.histogram(resolucao_adc=0.01, decimal_label=4)
 
+        # Análise Residual (Detrended) para o dashboard
+        temps = ds.samples
+        if temps.size > 1:
+            res_samples = detrend(temps)
+            res_stat = Stat(total_samples=len(res_samples), initial_data=res_samples)
+            res_hist = hybrid_histogram(
+                np.array(res_samples), res_stat.amplitude, res_stat.mean, 
+                resolucao_adc=0.01, decimal_label=6
+            )
+            residual_data = {
+                "labels": list(res_hist.keys()),
+                "values": list(res_hist.values()),
+                "std": res_stat.std
+            }
+        else:
+            residual_data = {"labels": [], "values": [], "std": 0}
+
         all_histograms[name] = {
             "labels": list(handler.time_series.timestamp),
             "values": list(handler.time_series.samples),
@@ -289,6 +306,7 @@ def get_histogram():
                 "labels": list(hist_dict.keys()),
                 "values": list(hist_dict.values()),
             },
+            "residual": residual_data,
             "stats": {
                 "n": len(ds),
                 "mean": ds.mean,
