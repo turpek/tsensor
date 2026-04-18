@@ -182,7 +182,7 @@ class MPS20Handler(PressureHandler):
         adc_max = 2 ** 24
         v_ref_milli = self._v_ref * 1000
         v_sensor_mv = (adc * v_ref_milli) / (B * adc_max)
-        press = (v_sensor_mv - self._offset) / self._sensitivity
+        press = (v_sensor_mv) / self._sensitivity
         return round(press, 4)
 
 

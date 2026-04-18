@@ -36,7 +36,7 @@ def get_residual_analysis():
     if not handler:
         return jsonify({"error": "Sensor não encontrado ou não configurado."}), 400
 
-    temps = handler.data.data
+    temps = handler.data.samples
     if not temps:
         return jsonify({"error": "Não há dados para análise."}), 400
 
@@ -77,7 +77,8 @@ def export_data():
         sensor_names = list(manager._handlers.keys())
 
         for name in sensor_names:
-            samples = manager._handlers[name].data.sample
+            ds = manager._handlers[name].data
+            samples = list(zip(ds.timestamp, ds.samples))
             sensor_data[name] = samples
             if len(samples) > max_len:
                 max_len = len(samples)
@@ -258,7 +259,7 @@ def get_histogram():
         # Só move para o histórico (time_series) se o buffer atingiu o limite configurado (is_full)
         if buffer.is_full:
             # Extrai o timestamp da última amostra do buffer
-            last_ts = buffer.sample[-1][0] if buffer.sample else None
+            last_ts = buffer.timestamp[-1] if buffer.timestamp else None
             # Adiciona a média do bloco ao histórico temporal
             handler.time_series.add(buffer.mean, timestamp=last_ts)
             # Limpa o buffer para o próximo bloco
@@ -268,8 +269,8 @@ def get_histogram():
         hist_dict = ds.histogram(resolucao_adc=0.01, decimal_label=4)
 
         all_histograms[name] = {
-            "labels": [s[0] for s in handler.time_series.sample],
-            "values": [s[1] for s in handler.time_series.sample],
+            "labels": list(handler.time_series.timestamp),
+            "values": list(handler.time_series.samples),
             "histogram": {
                 "labels": list(hist_dict.keys()),
                 "values": list(hist_dict.values()),
@@ -312,7 +313,7 @@ def download_charts_zip():
             unit = units.get(s_type, "")
 
             # 1. Gráfico de Série Temporal (Suavizado com Spline)
-            data_points = handler.time_series.sample
+            data_points = list(zip(handler.time_series.timestamp, handler.time_series.samples))
             if data_points:
                 labels = [p[0] for p in data_points]
                 values = np.array([p[1] for p in data_points])
@@ -357,7 +358,7 @@ def download_charts_zip():
                     f"serie_temporal_{safe_name}_{timestamp}.png", img_io.getvalue())
 
             # 2. Histograma Global
-            data_raw = np.array(handler.data.data)
+            data_raw = np.array(handler.data.samples)
             if len(data_raw) > 0:
                 plt.figure(figsize=(10, 6), dpi=100)
                 plt.hist(data_raw, bins="auto", color="#3b82f6",
@@ -377,7 +378,7 @@ def download_charts_zip():
 
             # 3. Gráfico de Resíduos (Detrended)
             if len(data_raw) > 1:
-                residuals = detrend(handler.data.data)
+                residuals = detrend(handler.data.samples)
                 plt.figure(figsize=(10, 6), dpi=100)
                 plt.hist(residuals, bins="auto", color="#818cf8",
                          alpha=0.7, edgecolor="white")

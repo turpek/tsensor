@@ -1,11 +1,17 @@
 from loguru import logger
 from tsensor.core.data_stream import DataStream
 from tsensor.core.handlers import StreamManager, HANDLERS
+from tsensor.core.sheets import SheetsManager, SpreadSheetRange
 from tsensor.core.utils import load_config
 
 # Carrega as configurações globais
 config = load_config()
 manager = StreamManager()
+
+# Instância e configuração global do SheetsManager
+sheet_manager = SheetsManager()
+sheet_manager.setup()
+sheet_range = SpreadSheetRange()
 
 
 def setup_manager(config: dict) -> StreamManager:

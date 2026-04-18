@@ -6,6 +6,9 @@ from tsensor.core.sheets import SheetsManager, SpreadSheetRange
 @pytest.fixture
 def mock_sheets_deps(mocker):
     """Isola completamente o SheetsManager de dependências externas (FileSystem e Google)."""
+    from tests.conftest import original_sheets_setup
+    mocker.patch("tsensor.core.sheets.SheetsManager.setup", new=original_sheets_setup)
+    
     # 1. Mock do Path com instâncias controladas
     m_path_class = mocker.patch("tsensor.core.sheets.Path")
     mock_instances = {}

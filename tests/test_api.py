@@ -232,11 +232,11 @@ def test_api_export_no_data_fails(client, mock_handler, mocker):
     """Verifica se /api/export falha quando não há dados no stream."""
     # Garante que o stream associado ao handler está vazio
     mock_handler.data = mocker.Mock(spec=DataStream)
-    type(mock_handler.data).sample = mocker.PropertyMock(return_value=[])
+    type(mock_handler.data).samples = mocker.PropertyMock(return_value=[])
+    type(mock_handler.data).timestamp = mocker.PropertyMock(return_value=[])
 
     # Mock do exportador para evitar execução de código real
     mocker.patch("tsensor.routes.api.CSVExporter")
-
     response = client.post("/api/export")
 
     assert response.status_code == 400

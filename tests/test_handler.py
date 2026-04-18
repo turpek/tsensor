@@ -162,21 +162,23 @@ def test_stream_manager_is_active_based_on_max_samples_per_sensor(stream_manager
 
 
 def test_mps20_conversion_logic(mps20_handler):
-    """Valida a fórmula matemática de conversão de pressão (Repouso)."""
-    # Valor de referência p/ 0 kPa no ESP32 @ 3.3V
-    adc_value = 14707010
-    # Deve resultar em aproximadamente 0 kPa
+    """Valida a fórmula matemática de conversão de pressão."""
+    # Sem offset, ADC 0 deve resultar em 0 kPa
+    adc_value = 0
     assert mps20_handler._convert(adc_value) == pytest.approx(0, abs=1e-2)
+
+    # Verifica o alvo de 93556 (ESP32 @ 3.3V, ganho 128, sens 1.6949)
+    assert mps20_handler._convert(93556) == pytest.approx(0.0848, abs=1e-2)
 
 
 def test_mps20_handle_valid_prefix(mps20_handler):
     """Verifica se o handler processa corretamente o prefixo P= com 24 bits."""
-    line = "P=14707010"
+    line = "P=93556"
     success = mps20_handler.handle(line)
     assert success is True
     assert len(mps20_handler.data) == 1
-    # Pressão de repouso ~ 0.0
-    assert mps20_handler.data.data[0] == pytest.approx(0, abs=1e-2)
+    # Pressão ~ 0.0848
+    assert mps20_handler.data.samples[0] == pytest.approx(0.0848, abs=1e-2)
 
 
 def test_mps20_handle_ignores_wrong_prefix(mps20_handler):
@@ -191,7 +193,7 @@ def test_mps20_custom_calibration():
     """Valida se o handler respeita offsets e sensibilidades customizadas."""
     # Usando valores realistas para 24 bits
     v_ref = 5.0
-    offset = 10.0
+    offset = 0.0  # offset não é mais usado
     sensitivity = 2.0
 
     custom_handler = MPS20Handler(
@@ -209,5 +211,5 @@ def test_mps20_custom_calibration():
     # adc = (1920.0 * 2**24) / (v_ref * 1000)
     adc_target = int((1920.0 * (2**24)) / (v_ref * 1000))
 
-    # Esperado: (15.0 - 10.0) / 2.0 = 2.5 kPa
-    assert custom_handler._convert(adc_target) == pytest.approx(2.5, abs=1e-2)
+    # Esperado com a nova fórmula: 15.0 / 2.0 = 7.5 kPa
+    assert custom_handler._convert(adc_target) == pytest.approx(7.5, abs=1e-2)
