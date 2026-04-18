@@ -117,9 +117,7 @@ def batch_manager(
 
             if not value_ranges or not value_ranges[0].get('values', []):
                 # Não encontrou valores na planilha (fim da planilha)
-                # Reverte o cursor para que a próxima chamada de major_row
-                # inicie a partir da mesma linha atual (_row)
-                sheet_range._end_row = sheet_range._row - 1
+                sheet_range.revert_rows(row)
                 sleep(sl)
                 return []
 
@@ -127,8 +125,8 @@ def batch_manager(
 
             if len(lines) < row:
                 # Leu menos dados do que pediu, compensa o fim do cursor
-                # para que a próxima leitura inicie logo após a última linha lida
-                sheet_range._end_row = sheet_range._row + len(lines) - 1
+                unread = row - len(lines)
+                sheet_range.revert_rows(unread)
 
             sleep(sl)
             return lines
@@ -136,5 +134,4 @@ def batch_manager(
             logger.error(f"Erro ao buscar dados do Sheets: {e}")
             sleep(sl)
             return []
-
     return []

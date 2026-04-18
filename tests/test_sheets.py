@@ -89,6 +89,35 @@ def test_clear_with_custom_start():
     sr.clear(10, 10)
     assert sr.to_a1() == "J10"
 
+
+def test_current_rows_property():
+    sr = SpreadSheetRange(1, 1)
+    # Range atual: A1
+    assert sr.current_rows == 1
+    
+    sr.major_row(5, 2)
+    # Range atual: A1:B5
+    assert sr.current_rows == 5
+
+
+def test_revert_rows():
+    sr = SpreadSheetRange(1, 1)
+    sr.major_row(5, 2)
+    # Range: A1:B5 (row=1, end_row=5)
+    
+    sr.revert_rows(2)
+    # Deve recuar end_row em 2 -> end_row = 3
+    # Então próximo major_row inicia no 4
+    sr.major_row(5, 2)
+    # Range novo: A4:B8
+    assert sr.to_a1() == "A4:B8"
+    
+    sr.revert_rows(10)
+    # Deve recuar end_row em 10 -> end_row = 8 - 10 = -2 -> forçado a 0
+    # Próximo major_row inicia no 1
+    sr.major_row(5, 2)
+    assert sr.to_a1() == "A1:B5"
+
 # --- Testes de Integração: SheetsManager ---
 
 

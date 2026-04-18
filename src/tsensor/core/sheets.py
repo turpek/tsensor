@@ -62,6 +62,26 @@ class SpreadSheetRange:
 
         return f"{start_cell}:{e_letter}{self._end_row}"
 
+    @property
+    def current_rows(self) -> int:
+        """Retorna a quantidade de linhas no intervalo atual."""
+        return (self._end_row - self._row) + 1
+
+    def revert_rows(self, unread_rows: int) -> None:
+        """
+        Retrai o final do intervalo descartando as linhas não lidas.
+        Utilizado para compensar leituras que atingiram o final da planilha (EOF),
+        garantindo que a próxima leitura inicie logo após a última linha válida.
+        """
+        if unread_rows <= 0:
+            return
+            
+        self._end_row -= unread_rows
+        
+        # Garante que o cursor final não fique antes do início
+        if self._end_row < 0:
+            self._end_row = 0
+
     def clear(self, row: int = 1, col: int = 1) -> None:
         """Reseta o cursor para uma nova posição inicial."""
         self._row = row
