@@ -1,0 +1,153 @@
+import pytest
+from pathlib import Path
+from tsensor.core.sheets import SheetsManager, SpreadSheetRange
+
+
+@pytest.fixture
+def mock_sheets_deps(mocker):
+    """Isola completamente o SheetsManager de dependências externas (FileSystem e Google)."""
+    # 1. Mock do Path com instâncias controladas
+    m_path_class = mocker.patch("tsensor.core.sheets.Path")
+    mock_instances = {}
+
+    def path_side_effect(p):
+        p_str = str(p)
+        if p_str not in mock_instances:
+            m_p = mocker.MagicMock(spec=Path)
+            m_p.__str__.return_value = p_str
+            m_p.exists.return_value = True
+            mock_instances[p_str] = m_p
+        return mock_instances[p_str]
+    m_path_class.side_effect = path_side_effect
+
+    # 2. Mock do builtin 'open' no namespace do módulo
+    m_open = mocker.patch("tsensor.core.sheets.open",
+                          mocker.mock_open(read_data='{"token": "dummy"}'))
+
+    # 3. Mock Google Auth e API
+    mock_creds = mocker.Mock()
+    mock_creds.valid = True
+    mock_creds.expired = False
+    mock_creds.refresh_token = "some_refresh_token"
+    mock_creds.to_json.return_value = '{"token": "mocked_json"}'
+
+    mocker.patch(
+        "tsensor.core.sheets.Credentials.from_authorized_user_file", return_value=mock_creds)
+    m_flow = mocker.patch("tsensor.core.sheets.InstalledAppFlow")
+    m_request = mocker.patch("tsensor.core.sheets.Request")
+    m_build = mocker.patch("tsensor.core.sheets.build")
+
+    return {
+        "path": m_path_class,
+        "instances": mock_instances,
+        "open": m_open,
+        "creds": mock_creds,
+        "flow": m_flow,
+        "build": m_build,
+        "request": m_request
+    }
+
+# --- Testes de Lógica: SpreadSheetRange ---
+
+
+def test_spreadsheet_range_initialization():
+    sr = SpreadSheetRange()
+    assert sr.to_a1() == "A1"
+
+
+def test_major_row_advances_cursor():
+    sr = SpreadSheetRange(1, 1)
+    sr.major_row(2, 2)
+    assert sr.to_a1() == "A1:B2"
+    sr.major_row(1, 3)
+    assert sr.to_a1() == "A3:C3"
+
+
+def test_major_col_advances_cursor():
+    sr = SpreadSheetRange(1, 1)
+    sr.major_col(2, 3)
+    assert sr.to_a1() == "A1:B3"
+    sr.major_col(2, 2)
+    assert sr.to_a1() == "C1:D2"
+
+
+def test_mixed_advancement():
+    sr = SpreadSheetRange(1, 1)
+    sr.major_row(1, 4)
+    assert sr.to_a1() == "A1:D1"
+    sr.major_col(1, 5)
+    assert sr.to_a1() == "E1:E5"
+
+
+def test_clear_with_custom_start():
+    sr = SpreadSheetRange(1, 1)
+    sr.major_row(2, 2)
+    sr.clear(10, 10)
+    assert sr.to_a1() == "J10"
+
+# --- Testes de Integração: SheetsManager ---
+
+
+def test_sheets_manager_setup_success(mock_sheets_deps):
+    manager = SheetsManager()
+    manager.setup()
+    mock_sheets_deps["build"].assert_called_once()
+    assert manager._sheet is not None
+
+
+def test_sheets_manager_export_calls_batch_update(mock_sheets_deps, mocker):
+    manager = SheetsManager()
+    mock_sheet_service = mocker.Mock()
+    manager._sheet = mock_sheet_service
+
+    sr = SpreadSheetRange(1, 1)
+    sr.major_row(2, 2)
+
+    manager.export([["d1", "d2"]], sr)
+    assert mock_sheet_service.values().batchUpdate.called
+    call_args = mock_sheet_service.values().batchUpdate.call_args[1]
+    assert call_args['body']['data'][0]['range'] == "Página1!A1:B2"
+
+
+def test_sheets_manager_fetch_data_calls_batch_get(mock_sheets_deps, mocker):
+    manager = SheetsManager()
+    mock_sheet_service = mocker.Mock()
+    manager._sheet = mock_sheet_service
+
+    sr = SpreadSheetRange(1, 1)
+    sr.major_col(2, 3)
+
+    manager.fetch_data(sr)
+    assert mock_sheet_service.values().batchGet.called
+    call_args = mock_sheet_service.values().batchGet.call_args[1]
+    assert call_args['ranges'] == ["Página1!A1:B3"]
+
+
+def test_sheets_manager_setup_expired_token_refresh(mock_sheets_deps):
+    mock_creds = mock_sheets_deps["creds"]
+    mock_creds.valid = False
+    mock_creds.expired = True
+
+    manager = SheetsManager()
+    manager.setup()
+
+    mock_creds.refresh.assert_called_once()
+
+
+def test_sheets_manager_setup_new_login(mock_sheets_deps):
+    # Simula que o TOKEN não existe (força novo login via credenciais)
+    mock_sheets_deps["path"]("token.json").exists.return_value = False
+
+    mock_flow_class = mock_sheets_deps["flow"]
+    mock_flow_instance = mock_flow_class.from_client_secrets_file.return_value
+    mock_flow_instance.run_local_server.return_value = mock_sheets_deps["creds"]
+
+    manager = SheetsManager(
+        credentials_path="creds.json", token_path="token.json")
+    manager.setup()
+
+    # Valida se usou o arquivo de credenciais correto e salvou no token.json
+    mock_flow_class.from_client_secrets_file.assert_called_once_with(
+        "creds.json", ["https://www.googleapis.com/auth/spreadsheets"]
+    )
+    assert mock_sheets_deps["open"].called
