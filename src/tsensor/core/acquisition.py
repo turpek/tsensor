@@ -1,7 +1,7 @@
 import threading
 from loguru import logger
-from tsensor.extensions import manager, config, setup_manager
-from tsensor.core.serial_reader import serial_reading
+from tsensor.extensions import manager, config, setup_manager, sheet_range
+from tsensor.core.serial_reader import sheets_reading
 
 # Controle global da thread
 _acquisition_thread = None
@@ -40,13 +40,11 @@ def start_acquisition():
                 setup_manager(config)
 
                 logger.info(
-                    f"Iniciando tentativa de conexão em {config['hardware']['port']}..."
+                    "Iniciando leitura a partir das planilhas Google Sheets..."
                 )
-                serial_reading(
-                    port=config["hardware"]["port"],
-                    baudrate=config["hardware"]["baudrate"],
+                sheets_reading(
+                    sheet_range=sheet_range,
                     stream_manager=manager,
-                    # O serial_reading deve ler o timeout da config hardware
                     timeout=config["hardware"].get("timeout", 1.0),
                 )
             except Exception as e:

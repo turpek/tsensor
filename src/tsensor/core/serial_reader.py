@@ -50,7 +50,7 @@ def sheets_reading(
 
     logger.info("Iniciando coleta a partir das planilhas...")
     cols = 1 + len(stream_manager)
-    batch_size = 10
+    batch_size = 50
 
     while stream_manager.is_active:
         lines = batch_manager('READ', 1, batch_size, cols, sheet)
@@ -112,6 +112,7 @@ def batch_manager(
 
         sheet_range.major_row(row, col)
         try:
+            print(" A1", sheet_range.to_a1())
             result = sheet_manager.fetch_data(sheet_range)
             value_ranges = result.get('valueRanges', [])
 

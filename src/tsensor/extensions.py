@@ -1,6 +1,6 @@
 from loguru import logger
 from tsensor.core.data_stream import DataStream
-from tsensor.core.handlers import StreamManager, HANDLERS
+from tsensor.core.handlers import StreamManager, HANDLERS, SheetsHandler
 from tsensor.core.sheets import SheetsManager, SpreadSheetRange
 from tsensor.core.utils import load_config
 
@@ -11,7 +11,7 @@ manager = StreamManager()
 # Instância e configuração global do SheetsManager
 sheet_manager = SheetsManager()
 sheet_manager.setup()
-sheet_range = SpreadSheetRange()
+sheet_range = SpreadSheetRange(row=2)
 
 
 def setup_manager(config: dict) -> StreamManager:
@@ -35,10 +35,17 @@ def setup_manager(config: dict) -> StreamManager:
         data_buffer = DataStream(total_samples=buffer_limit)
         time_series = DataStream(total_samples=timeseries_limit)
 
-        cls_handler = HANDLERS.get(sensor_model)
         kwargs = sensor.get('calibration', {})
         name = sensor.get('name')
-        handler = cls_handler(data_stream, data_buffer, time_series, **kwargs)
+        
+        handler = SheetsHandler(
+            data=data_stream,
+            data_buffer=data_buffer,
+            time_series=time_series,
+            name=name,
+            adc_max=kwargs.get('adc_max', 4095),
+            v_ref=kwargs.get('v_ref', 3.3)
+        )
         manager.add_handler(name, handler)
 
     if len(manager) == 0:
