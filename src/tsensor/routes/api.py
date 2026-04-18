@@ -313,7 +313,8 @@ def download_charts_zip():
             unit = units.get(s_type, "")
 
             # 1. Gráfico de Série Temporal (Suavizado com Spline)
-            data_points = list(zip(handler.time_series.timestamp, handler.time_series.samples))
+            data_points = list(
+                zip(handler.time_series.timestamp, handler.time_series.samples))
             if data_points:
                 labels = [p[0] for p in data_points]
                 values = np.array([p[1] for p in data_points])

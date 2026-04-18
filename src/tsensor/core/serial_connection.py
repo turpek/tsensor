@@ -7,14 +7,14 @@ from serial import Serial as _RealSerial, SerialException
 # Tabela de referência: (mcu, vref) -> targets de ADC
 SIM_DATA = {
     ("esp32", 3.3): {
-        "P": 93556,  # Alvo: 0.5 kPa
+        "P": 93556,
         "LM35": 310,
         "NTC": 2047,
         "sigma_t": 2,
         "sigma_p": 150
     },
     ("arduino_uno", 5.0): {
-        "P": 11162548,  # Alvo: 2.0 kPa
+        "P": 93556,
         "LM35": 51,
         "NTC": 511,
         "sigma_t": 1,
@@ -52,7 +52,7 @@ class VirtualSerial:
 
         # Seleciona os targets da tabela ou usa default (ESP32)
         self.targets = SIM_DATA.get((mcu, vref), DEFAULT_TARGETS)
-        self.active_models = [s["model"] for s in config["sensors"]]
+        self.active_models = [s["model"] for s in config.get("sensors", [])]
 
         # Carrega latência configurada (Padrão 100ms se ausente)
         latency_us = config["hardware"].get("simulation_latency_us", 100000)

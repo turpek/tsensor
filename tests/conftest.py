@@ -1,3 +1,4 @@
+from tsensor.app import app
 import pytest
 from unittest import mock
 
@@ -6,8 +7,6 @@ from unittest import mock
 from tsensor.core.sheets import SheetsManager
 original_sheets_setup = SheetsManager.setup
 SheetsManager.setup = mock.MagicMock()
-
-from tsensor.app import app
 
 
 @pytest.fixture(autouse=True)

@@ -24,7 +24,7 @@ class SerialHandler(Protocol):
     ):
         ...
 
-    def handle(self, line: str) -> bool:
+    def handle(self, line: str | float) -> bool:
         ...
 
     @property
@@ -38,6 +38,42 @@ class SerialHandler(Protocol):
     @property
     def time_series(self) -> DataStream:
         ...
+
+
+class SheetsHandler:
+
+    def __init__(
+        self,
+        data: DataStream,
+        data_buffer: DataStream,
+        time_series: DataStream,
+        name: str,
+        adc_max: int,
+        v_ref: float,
+    ):
+        self._data = data
+        self._data_buffer = data_buffer
+        self._time_series = time_series
+        self._name = name
+
+    def handle(self, line: str, timestamp: str = '') -> bool:
+        line = float(line)
+        logger.debug(f"{self._name}: {line:.4f}")
+        self._data.add(line, timestamp)
+        self._data_buffer.add(line, timestamp)
+        return True
+
+    @property
+    def data_buffer(self) -> DataStream:
+        return self._data_buffer
+
+    @property
+    def data(self) -> DataStream:
+        return self._data
+
+    @property
+    def time_series(self) -> DataStream:
+        return self._time_series
 
 
 class PressureHandler(ABC):
@@ -221,6 +257,14 @@ class StreamManager:
         counts = [self._count]
         for handler in self._handlers.values():
             handler.handle(line)
+            counts.append(len(handler.data))
+        self._count = max(counts)
+
+    def dispatch_sheets(self, line: str) -> None:
+        counts = [self._count]
+        ts = line[0]
+        for handler, col in zip(self._handlers.values(), line[1:]):
+            handler.handle(col, ts)
             counts.append(len(handler.data))
         self._count = max(counts)
 

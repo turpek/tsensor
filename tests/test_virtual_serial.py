@@ -19,7 +19,7 @@ def test_virtual_serial_readline_format(mocker):
 def test_virtual_serial_values_within_range(mocker):
     """Valida se os valores gerados estão coerentes com a tabela de hardware (ESP32)."""
     mocker.patch("time.sleep")  # Acelera o teste
-    
+
     # Mock da config com DOIS sensores ativos para testar o novo formato T=NUM,P=NUM
     mock_config = {
         "hardware": {"mcu": "esp32", "simulation_latency_us": 100},
@@ -29,7 +29,7 @@ def test_virtual_serial_values_within_range(mocker):
         ],
         "acquisition": {"max_runtime_sec": 1800, "total_samples": 1000000}
     }
-    mocker.patch("tsensor.extensions.config", mock_config)
+    mocker.patch.dict("tsensor.extensions.config", mock_config, clear=True)
 
     v_serial = VirtualSerial("SIM", 115200)
 
@@ -42,8 +42,9 @@ def test_virtual_serial_values_within_range(mocker):
         assert "," in line
 
         # Parsing robusto do novo formato T=NUM,P=NUM
-        parts = {p.split("=")[0]: int(p.split("=")[1]) for p in line.split(",")}
-        
+        parts = {p.split("=")[0]: int(p.split("=")[1])
+                 for p in line.split(",")}
+
         # Verifica ranges do ESP32 (LM35 ~310, MPS20 ~93556)
         assert 200 < parts["T"] < 400
         assert 90000 < parts["P"] < 96000
