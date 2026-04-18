@@ -98,9 +98,10 @@ def save_config(config_dict: dict) -> None:
         toml.dump(config_dict, f)
 
 
-def detrend(samples: list[float]) -> list[float]:
-
-    if not samples:
+def detrend(samples: list[float] | np.ndarray) -> list[float]:
+    # Converte para array se for lista, mas mantém se já for array
+    s_arr = np.array(samples)
+    if s_arr.size == 0:
         return []
     elif len(samples) == 1:
         return [0.0]
@@ -230,26 +231,34 @@ class Stat:
         return self._tc_samples
 
     def __atomic_update(self, data: np.ndarray) -> None:
-        self._total_count = len(data)
+        n = len(data)
+        if n == 0:
+            return
+
+        self._total_count = n
         self._mean = np.mean(data)
         self._max = np.max(data)
         self._min = np.min(data)
-        self.__m2 = np.var(data) * len(data)
+        self.__m2 = np.var(data) * n
 
-        idx = len(data) - self._total_samples
+        idx = n - self._total_samples
         dt = data if idx < 0 else data[idx:]
         self._tc_samples = len(dt)
         self._moving_sum = np.sum(dt)
-        self._moving_average = self._moving_sum / self._tc_samples
+        self._moving_average = self._moving_sum / self._tc_samples if self._tc_samples > 0 else 0.0
 
     def _update_shift_and_mean(self, data: float) -> None:
         self.__old_shift = data - self._mean
-        self._mean += self.__old_shift / self._total_count
+        # Proteção total_count > 0
+        if self._total_count > 0:
+            self._mean += self.__old_shift / self._total_count
+        else:
+            self._mean = data
         self.__new_shift = data - self.mean
         self.__m2 += self.__new_shift * self.__old_shift
 
     def __maintain_window(self, old_date) -> None:
-        if old_date and self._total_samples >= self._tc_samples:
+        if old_date is not None and self._tc_samples > 0:
             self._moving_sum -= old_date
             self._tc_samples -= 1
 
@@ -260,7 +269,7 @@ class Stat:
         self._update_shift_and_mean(data)
         self._max = max(data, self._max)
         self._min = min(data, self._min)
-        self._moving_average = self._moving_sum / self._tc_samples
+        self._moving_average = self._moving_sum / self._tc_samples if self._tc_samples > 0 else 0.0
 
     def update(self, new_data: float, old_date: Optional[float] = None) -> None:
         self.__maintain_window(old_date)

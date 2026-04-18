@@ -37,7 +37,7 @@ def get_residual_analysis():
         return jsonify({"error": "Sensor não encontrado ou não configurado."}), 400
 
     temps = handler.data.samples
-    if not temps:
+    if temps.size == 0:
         return jsonify({"error": "Não há dados para análise."}), 400
 
     # Extrai apenas as temperaturas e aplica detrend

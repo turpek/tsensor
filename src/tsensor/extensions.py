@@ -10,7 +10,9 @@ manager = StreamManager()
 
 # Instância e configuração global do SheetsManager
 sheet_manager = SheetsManager()
-sheet_manager.setup()
+# Expande a planilha conforme as amostras configuradas (+1 para cabeçalho) e 3 colunas (TS, Temp, Pres)
+total_samples = config["acquisition"].get("total_samples", 1000)
+sheet_manager.setup(row_count=total_samples + 1, col_count=3)
 sheet_range = SpreadSheetRange(row=2)
 
 
@@ -37,7 +39,7 @@ def setup_manager(config: dict) -> StreamManager:
 
         kwargs = sensor.get('calibration', {})
         name = sensor.get('name')
-        
+
         handler = SheetsHandler(
             data=data_stream,
             data_buffer=data_buffer,

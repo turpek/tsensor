@@ -94,7 +94,7 @@ def test_current_rows_property():
     sr = SpreadSheetRange(1, 1)
     # Range atual: A1
     assert sr.current_rows == 1
-    
+
     sr.major_row(5, 2)
     # Range atual: A1:B5
     assert sr.current_rows == 5
@@ -104,14 +104,14 @@ def test_revert_rows():
     sr = SpreadSheetRange(1, 1)
     sr.major_row(5, 2)
     # Range: A1:B5 (row=1, end_row=5)
-    
+
     sr.revert_rows(2)
     # Deve recuar end_row em 2 -> end_row = 3
     # Então próximo major_row inicia no 4
     sr.major_row(5, 2)
     # Range novo: A4:B8
     assert sr.to_a1() == "A4:B8"
-    
+
     sr.revert_rows(10)
     # Deve recuar end_row em 10 -> end_row = 8 - 10 = -2 -> forçado a 0
     # Próximo major_row inicia no 1
@@ -154,6 +154,45 @@ def test_sheets_manager_fetch_data_calls_batch_get(mock_sheets_deps, mocker):
     assert mock_sheet_service.values().batchGet.called
     call_args = mock_sheet_service.values().batchGet.call_args[1]
     assert call_args['ranges'] == ["Página1!A1:B3"]
+
+
+def test_sheets_manager_fetch_metadata_success(mock_sheets_deps, mocker):
+    """Valida a extração de metadados (dimensões e cabeçalho)."""
+    manager = SheetsManager()
+    mock_sheet_service = mocker.Mock()
+    manager._sheet = mock_sheet_service
+
+    # 1. Mock do spreadsheet.get().execute() -> Dimensões
+    mock_spreadsheet_resp = {
+        'sheets': [{
+            'properties': {
+                'title': 'Página1',
+                'gridProperties': {'rowCount': 100, 'columnCount': 10}
+            }
+        }]
+    }
+    mock_sheet_service.get.return_value.execute.return_value = mock_spreadsheet_resp
+
+    # 2. Mock do values().get().execute() -> Cabeçalho
+    mock_values_resp = {'values': [['timestamp', 'temp', 'pres']]}
+    mock_sheet_service.values.return_value.get.return_value.execute.return_value = mock_values_resp
+
+    # Execução
+    result = manager.fetch_metadata("Página1")
+
+    # Verificações
+    assert result["rowCount"] == 100
+    assert result["columnCount"] == 10
+    assert result["header"] == ['timestamp', 'temp', 'pres']
+    assert manager.metadata == result
+
+    # Verifica se as chamadas foram corretas
+    mock_sheet_service.get.assert_called_with(
+        spreadsheetId="1E9ws5ui_I5rw58dLbIXrFTggOQ87mCAAit3nCeSkFp8")
+    mock_sheet_service.values.return_value.get.assert_called_with(
+        spreadsheetId="1E9ws5ui_I5rw58dLbIXrFTggOQ87mCAAit3nCeSkFp8",
+        range="Página1!1:1"
+    )
 
 
 def test_sheets_manager_setup_expired_token_refresh(mock_sheets_deps):

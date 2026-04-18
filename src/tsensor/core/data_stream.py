@@ -38,7 +38,7 @@ class DataStream(Stat):
         resolucao_adc: float,
         decimal_label: int = 1,
     ) -> dict[str, int]:
-        data = np.array([d for d in self.samples])
+        data = np.array(self.samples)
         return hybrid_histogram(
             data,
             self.amplitude,
@@ -48,9 +48,11 @@ class DataStream(Stat):
         )
 
     @property
-    def samples(self) -> deque[float]:
-        return self._data
+    def samples(self) -> np.ndarray:
+        with self._lock:
+            return np.array(self._data)
 
     @property
-    def timestamp(self) -> deque[str]:
-        return self._ts
+    def timestamp(self) -> list[str]:
+        with self._lock:
+            return list(self._ts)

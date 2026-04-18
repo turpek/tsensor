@@ -321,6 +321,9 @@ def test_api_download_charts_zip_success(client, mock_handler, mocker):
     import io
     import zipfile
 
+    # Mocka o savefig para evitar renderização real (MUITO mais rápido)
+    mocker.patch("matplotlib.pyplot.savefig")
+
     # Popula o handler com dados fictícios para gerar gráficos
     for i in range(5):
         mock_handler.data.add(20.0 + i, timestamp=f"10:00:0{i}")
