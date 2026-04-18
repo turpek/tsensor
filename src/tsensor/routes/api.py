@@ -8,10 +8,20 @@ import numpy as np
 from flask import Blueprint, render_template, jsonify, request
 from tsensor.extensions import manager, config, app_status
 from tsensor.core.utils import save_config, detrend, Stat, hybrid_histogram
-from tsensor.core.acquisition import start_acquisition, stop_acquisition
+from tsensor.core.acquisition import start_acquisition, stop_acquisition, start_serial
 from tsensor.core.exporters import CSVExporter
 
 api_route = Blueprint("api", __name__, url_prefix="/api")
+
+
+@api_route.route("/start-serial", methods=["POST"])
+def start_serial_route():
+    """Ativa a aquisição via porta serial em tempo real."""
+    try:
+        start_serial()
+        return jsonify({"success": True, "message": "Modo Tempo Real ativado."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 def _get_main_handler():
@@ -177,6 +187,10 @@ def update_config():
             data.get("max_runtime_sec", 1800))
     else:
         config["acquisition"].pop("max_runtime_sec", None)
+
+    if "serial_batch_size" in data:
+        config["acquisition"]["serial_batch_size"] = int(
+            data["serial_batch_size"])
 
     config["presentation"]["update_interval_ms"] = int(
         data.get("update_interval_ms",

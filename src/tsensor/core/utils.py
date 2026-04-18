@@ -245,7 +245,8 @@ class Stat:
         dt = data if idx < 0 else data[idx:]
         self._tc_samples = len(dt)
         self._moving_sum = np.sum(dt)
-        self._moving_average = self._moving_sum / self._tc_samples if self._tc_samples > 0 else 0.0
+        self._moving_average = self._moving_sum / \
+            self._tc_samples if self._tc_samples > 0 else 0.0
 
     def _update_shift_and_mean(self, data: float) -> None:
         self.__old_shift = data - self._mean
@@ -269,7 +270,8 @@ class Stat:
         self._update_shift_and_mean(data)
         self._max = max(data, self._max)
         self._min = min(data, self._min)
-        self._moving_average = self._moving_sum / self._tc_samples if self._tc_samples > 0 else 0.0
+        self._moving_average = self._moving_sum / \
+            self._tc_samples if self._tc_samples > 0 else 0.0
 
     def update(self, new_data: float, old_date: Optional[float] = None) -> None:
         self.__maintain_window(old_date)

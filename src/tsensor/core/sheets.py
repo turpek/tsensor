@@ -129,20 +129,22 @@ class SheetsManager(DataExporter):
 
         # Configura a grade inicial se solicitado
         if row_count or col_count:
-            self._ensure_grid_size(row_count or 1000, col_count or 3, sheet_name)
+            self._ensure_grid_size(
+                row_count or 1000, col_count or 3, sheet_name)
 
         return self._sheet
 
     def _ensure_grid_size(self, rows: int, cols: int, sheet_name: str) -> None:
         """Ajusta o tamanho da grade da planilha para os valores exatos."""
         try:
-            spreadsheet = self._sheet.get(spreadsheetId=SPREADSHEET_ID).execute()
+            spreadsheet = self._sheet.get(
+                spreadsheetId=SPREADSHEET_ID).execute()
             sheet_id = None
             for s in spreadsheet.get('sheets', []):
                 if s.get('properties', {}).get('title') == sheet_name:
                     sheet_id = s.get('properties', {}).get('sheetId')
                     break
-            
+
             if sheet_id is not None:
                 body = {
                     'requests': [{
@@ -158,9 +160,11 @@ class SheetsManager(DataExporter):
                         }
                     }]
                 }
-                self._sheet.batchUpdate(spreadsheetId=SPREADSHEET_ID, body=body).execute()
+                self._sheet.batchUpdate(
+                    spreadsheetId=SPREADSHEET_ID, body=body).execute()
         except Exception as e:
-            logger.warning(f"Ajuste de grade falhou (provavelmente limite de 10M de células): {e}")
+            logger.warning(
+                f"Ajuste de grade falhou (provavelmente limite de 10M de células): {e}")
 
     def export(
         self,
@@ -189,7 +193,8 @@ class SheetsManager(DataExporter):
         except Exception as e:
             # Se o erro for por limite de grade, tenta expandir e repetir
             if "exceeds grid limits" in str(e):
-                self._ensure_grid_size(sheet_range._end_row, sheet_range._end_col, name)
+                self._ensure_grid_size(
+                    sheet_range._end_row, sheet_range._end_col, name)
                 return self._sheet.values().batchUpdate(
                     spreadsheetId=SPREADSHEET_ID,
                     body=body

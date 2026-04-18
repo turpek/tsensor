@@ -2,40 +2,88 @@ from loguru import logger
 from tsensor.core.serial_connection import Serial, SerialException
 from tsensor.core.handlers import StreamManager
 from tsensor.core.sheets import SheetsManager, SpreadSheetRange
-from tsensor.extensions import app_status, sheet_range
+from tsensor.extensions import app_status, config, setup_serial_manager
 from time import sleep
-from typing import Optional, Union
 
 
 def serial_reading(
     port: str, baudrate: int, stream_manager: StreamManager, timeout: float = 1.0
 ) -> None:
+    """Aquisição Serial em tempo real com exportação em lotes para o Google Sheets."""
     try:
         ser = Serial(port, baudrate, timeout=timeout)
         app_status["connected"] = True
         app_status["error"] = None
-        logger.info(f"Conexão serial estabelecida em {port}")
+        logger.info(f"Conexão serial estabelecida em {port} (Tempo Real)")
     except SerialException as e:
         app_status["connected"] = False
         app_status["error"] = str(e)
         logger.error(f"Erro ao abrir porta serial {port}: {e}")
         return None
 
-    logger.info("Iniciando coleta...")
+    # Configuração do manager local para lotes
+    local_manager = setup_serial_manager(config)
+    batch_size = config["acquisition"].get("serial_batch_size", 50)
 
-    while stream_manager.is_active:
-        line = ser.readline().decode("utf-8", errors="ignore").strip()
-        stream_manager.dispatch(line)
+    # Gerenciador de exportação local
+    sheet = SheetsManager()
+    sheet.setup()
+    export_cursor = SpreadSheetRange(row=2)
 
-    ser.close()
     logger.info(
-        f"Coleta finalizada: {stream_manager.count_samples} amostras",
-    )
+        f"Iniciando coleta Serial (Modo Batch Export: {batch_size})...")
+
+    try:
+        while stream_manager.is_active:
+            line = ser.readline().decode("utf-8", errors="ignore").strip()
+            if not line:
+                continue
+
+            # Despacha APENAS para o manager local (acumulação para Sheets)
+            local_manager.dispatch(line)
+
+            # Assume que todos os handlers têm o mesmo tamanho
+            first_handler = next(iter(local_manager._handlers.values()))
+
+            if len(first_handler.data) >= batch_size:
+                logger.info(f"Exportando lote de {batch_size} amostras...")
+
+                # Prepara os dados: [ [TS, V1, V2...], [...] ]
+                export_data = []
+                handlers = list(local_manager._handlers.values())
+
+                # timestamps e amostras do lote atual
+                tss = handlers[0].data.timestamp
+                samples_matrix = [h.data.samples for h in handlers]
+
+                for i in range(batch_size):
+                    row = [tss[i]]
+                    for sensor_samples in samples_matrix:
+                        row.append(sensor_samples[i])
+                    export_data.append(row)
+
+                # Avança e exporta
+                export_cursor.major_row(batch_size, 1 + len(handlers))
+                sheet.export(export_data, export_cursor)
+
+                # Limpa os buffers locais
+                for h in handlers:
+                    h.data.clear()
+
+                # Reset manual do contador interno do manager local para evitar acúmulo infinito
+                local_manager._count = 0
+
+    except Exception as e:
+        logger.error(f"Erro crítico na aquisição Serial: {e}")
+    finally:
+        ser.close()
+        logger.info("Coleta Serial finalizada.")
 
 
 def sheets_reading(
-    sheet_range: SpreadSheetRange, stream_manager: StreamManager, timeout: float = 1.0
+    stream_manager: StreamManager, timeout: float = 1.0
 ) -> None:
+    """Realiza a leitura do Google Sheets de forma síncrona e autônoma."""
     try:
         sheet = SheetsManager()
         sheet.setup()
@@ -48,91 +96,50 @@ def sheets_reading(
         logger.error("Erro ao tentar se conectar ao Google Sheets")
         return None
 
-    logger.info("Iniciando coleta a partir das planilhas...")
+    # Cursor de leitura local, iniciando na linha 2 (após cabeçalho)
+    read_cursor = SpreadSheetRange(row=2)
     cols = 1 + len(stream_manager)
-    batch_size = 50
+    batch_size = 200  # Aumentado para ler mais de uma vez e economizar requisições
+
+    # Tempo de segurança para não estourar a cota de 60 req/min do Google
+    # Valor mínimo de 1.5s entre requisições
+    safe_interval = max(1.5, timeout)
+
+    logger.info("Iniciando monitoramento da planilha...")
 
     while stream_manager.is_active:
-        lines = batch_manager('READ', 1, batch_size, cols, sheet)
-        if isinstance(lines, list):
-            for line in lines:
-                stream_manager.dispatch_sheets(line)
+        try:
+            # Avança o cursor para o próximo lote
+            read_cursor.major_row(batch_size, cols)
+
+            # Busca dados diretamente
+            result = sheet.fetch_data(read_cursor)
+            value_ranges = result.get('valueRanges', [])
+            lines = value_ranges[0].get('values', []) if value_ranges else []
+
+            if lines:
+                for line in lines:
+                    stream_manager.dispatch_sheets(line)
+
+                # Se leu menos do que o lote, recua o cursor para a posição da última linha lida
+                if len(lines) < batch_size:
+                    unread = batch_size - len(lines)
+                    read_cursor.revert_rows(unread)
+            else:
+                # Nenhuma linha nova encontrada, recua e tenta na próxima iteração
+                read_cursor.revert_rows(batch_size)
+
+        except Exception as e:
+            if "429" in str(e):
+                logger.warning(
+                    "Cota da API excedida (429). Aguardando 15 segundos para cooldown...")
+                sleep(15)
+            else:
+                logger.error(f"Erro durante a leitura do Sheets: {e}")
+            read_cursor.revert_rows(batch_size)
+
+        # O SLEEP SEMPRE DEVE OCORRER PARA RESPEITAR A COTA
+        sleep(safe_interval)
 
     logger.info(
-        f"Coleta finalizada: {stream_manager.count_samples} amostras",
-    )
-
-
-def offline_reading(
-    stream_manager: StreamManager, timeout: float = 1.0
-) -> None:
-    """
-    Função que substitui o `serial_reading` no modo offline.
-    Apenas avança o cursor no SpreadSheetRange chamando o batch_manager,
-    para simular a chegada de novos dados e permitir que o sheets_reading os leia.
-    """
-    logger.info("Iniciando controle de lotes (Modo Offline)...")
-
-    # 1 coluna para timestamp + 1 coluna para cada sensor ativo
-    cols = 1 + len(stream_manager)
-    batch_size = 10
-    sleep_time = 1
-
-    while stream_manager.is_active:
-        # Atualiza o range a cada ciclo (como se novos dados estivessem chegando)
-        batch_manager('WRITE', sleep_time, batch_size, cols)
-
-    logger.info("Controle de lotes (Modo Offline) finalizado.")
-
-
-def batch_manager(
-    mode: str,
-    sl: int,
-    row: int,
-    col: int,
-    sheet_manager: Optional[SheetsManager] = None
-) -> Union[SpreadSheetRange, list]:
-    """
-        Função que centraliza o gerenciamento de lotes de dados.
-
-        mode: define o tipo de operação:
-              'WRITE': row e col atualizam o range, simulando gravação.
-              'READ': busca os dados do range atual, avançando o cursor e lidando com o EOF.
-        sl: tempo de aguardo para outra chamada da api
-    """
-    if mode == 'WRITE':
-        sheet_range.major_row(row, col)
-        sleep(sl)
-        return sheet_range
-    elif mode == 'READ':
-        if not sheet_manager:
-            logger.error("sheet_manager é obrigatório no modo READ")
-            sleep(sl)
-            return []
-
-        sheet_range.major_row(row, col)
-        try:
-            print(" A1", sheet_range.to_a1())
-            result = sheet_manager.fetch_data(sheet_range)
-            value_ranges = result.get('valueRanges', [])
-
-            if not value_ranges or not value_ranges[0].get('values', []):
-                # Não encontrou valores na planilha (fim da planilha)
-                sheet_range.revert_rows(row)
-                sleep(sl)
-                return []
-
-            lines = value_ranges[0].get('values', [])
-
-            if len(lines) < row:
-                # Leu menos dados do que pediu, compensa o fim do cursor
-                unread = row - len(lines)
-                sheet_range.revert_rows(unread)
-
-            sleep(sl)
-            return lines
-        except Exception as e:
-            logger.error(f"Erro ao buscar dados do Sheets: {e}")
-            sleep(sl)
-            return []
-    return []
+        f"Monitoramento Sheets finalizado. Total: {stream_manager.count_samples}")
