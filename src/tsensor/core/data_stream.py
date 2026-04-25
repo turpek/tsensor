@@ -12,7 +12,6 @@ class DataStream(Stat):
 
         self._lock = Lock()
         self._data: deque[float] = deque()
-        self._ts: deque[str] = deque()
 
     def __len__(self) -> int:
         return len(self._data)
@@ -22,11 +21,10 @@ class DataStream(Stat):
             old_data = self._data.popleft()
             return old_data
 
-    def add(self, data: float, timestamp: str) -> None:
+    def add(self, data: float) -> None:
         with self._lock:
             old_data = self._maintain_window()
             self._data.append(data)
-            self._ts.append(timestamp)
             self.update(data, old_data)
 
     def clear(self, total_samples: Optional[int] = None) -> None:
@@ -51,8 +49,3 @@ class DataStream(Stat):
     def samples(self) -> np.ndarray:
         with self._lock:
             return np.array(self._data)
-
-    @property
-    def timestamp(self) -> list[str]:
-        with self._lock:
-            return list(self._ts)

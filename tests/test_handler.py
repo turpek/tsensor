@@ -1,6 +1,36 @@
 import time
 import pytest
-from tsensor.core.handlers import NTCHandler, LM35Handler, MPS20Handler, StreamManager
+from tsensor.core.handlers import NTCHandler, LM35Handler, MPS20Handler, StreamManager, SheetsHandler, TimestampHandler
+...
+@pytest.fixture
+def timestamp_handler():
+    # Mockando as streams para o handler
+    data = DataStream(total_samples=100)
+    buffer = DataStream(total_samples=100)
+    ts_series = DataStream(total_samples=100)
+    return TimestampHandler(data, buffer, ts_series, name="Relógio", adc_max=0, v_ref=0.0)
+
+
+def test_handle_valid_unix_timestamp(timestamp_handler):
+    """Testa o processamento de um Unix Timestamp válido via API pública (prefixo U=)."""
+    ts_str = "U=1714088826.873"
+    success = timestamp_handler.handle(ts_str)
+
+    assert success is True
+    assert timestamp_handler.data.samples[0] == 1714088826.873
+
+
+def test_handle_invalid_timestamp_falls_back_to_now(timestamp_handler, mocker):
+    """Testa se valores inválidos resultam no timestamp atual via API pública."""
+    # Mockamos a função time do módulo handlers
+    mock_now = 123456789.0
+    mocker.patch("tsensor.core.handlers.time", return_value=mock_now)
+
+    success = timestamp_handler.handle("valor_invalido")
+
+    assert success is True
+    # O valor armazenado deve ser o valor retornado pelo time()
+    assert timestamp_handler.data.samples[0] == mock_now
 from tsensor.core.data_stream import DataStream
 
 # --- FIXTURES ---
@@ -102,6 +132,43 @@ def test_stream_manager_dispatch_to_multiple_handlers(stream_manager):
     stream_manager.dispatch("T=512")
     assert len(d1) == 1
     assert len(d2) == 1
+
+
+def test_stream_manager_dispatch_with_iterator(stream_manager):
+    """Verifica se o dispatch com iterador distribui os valores entre os handlers."""
+    d1, b1, t1 = DataStream(10), DataStream(10), DataStream(10)
+    h1 = SheetsHandler(d1, b1, t1, "h1", 1023, 1.1)
+
+    d2, b2, t2 = DataStream(10), DataStream(10), DataStream(10)
+    h2 = SheetsHandler(d2, b2, t2, "h2", 1023, 1.1)
+
+    stream_manager.add_handler("s1", h1)
+    stream_manager.add_handler("s2", h2)
+
+    data = ["10.5", "20.5"]
+    stream_manager.dispatch(iter(data))
+
+    assert len(d1) == 1
+    assert d1.samples[0] == 10.5
+    assert len(d2) == 1
+    assert d2.samples[0] == 20.5
+
+
+def test_sheets_handler_consumes_iterator(lm35_handler):
+    """Verifica se o SheetsHandler consome corretamente um elemento do iterador."""
+    # Embora usemos lm35_handler (que é TemperatureHandler), o SheetsHandler é quem
+    # implementa a lógica de consumo de iterador no novo design do sistema.
+    # Mas como o usuário disse que TemperatureHandler continua Regex, vamos criar um SheetsHandler real.
+    d, b, t = DataStream(10), DataStream(10), DataStream(10)
+    handler = SheetsHandler(d, b, t, "Teste", 1023, 1.1)
+    
+    it = iter(["25.5", "ignored"])
+    success = handler.handle(it)
+    
+    assert success is True
+    assert d.samples[0] == 25.5
+    # Verifica se o iterador avançou
+    assert next(it) == "ignored"
 
 
 def test_stream_manager_is_active_with_total_samples_limit():

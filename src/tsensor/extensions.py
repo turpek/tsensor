@@ -1,7 +1,7 @@
 from loguru import logger
 from tsensor.core.data_stream import DataStream
-from tsensor.core.handlers import StreamManager, HANDLERS, SheetsHandler
-from tsensor.core.sheets import SheetsManager, SpreadSheetRange
+from tsensor.core.sheets import SheetsManager
+from tsensor.core.handlers import StreamManager, HANDLERS, SheetsHandler, TimestampHandler
 from tsensor.core.utils import load_config
 
 # Carrega as configurações globais
@@ -13,7 +13,6 @@ sheet_manager = SheetsManager()
 # Expande a planilha conforme as amostras configuradas (+1 para cabeçalho) e 3 colunas (TS, Temp, Pres)
 total_samples = config["acquisition"].get("total_samples", 1000)
 sheet_manager.setup(row_count=total_samples + 1, col_count=3)
-sheet_range = SpreadSheetRange(row=2)
 
 
 def setup_serial_manager(config: dict) -> StreamManager:
@@ -28,7 +27,19 @@ def setup_serial_manager(config: dict) -> StreamManager:
         total_samples=None,  # O controle de parada será externo ou via is_active global
     )
 
+    # Adiciona o TimestampHandler como primeiro da fila
+    ts_handler = TimestampHandler(
+        data=DataStream(total_samples=batch_limit),
+        data_buffer=DataStream(total_samples=1),
+        time_series=DataStream(total_samples=1),
+        name="timestamp",
+        adc_max=0,
+        v_ref=0.0
+    )
+    serial_manager.add_handler("timestamp", ts_handler)
+
     for sensor in config.get('sensors', []):
+
         sensor_model = sensor.get("model")
         if sensor_model not in HANDLERS:
             continue
@@ -55,7 +66,7 @@ def setup_serial_manager(config: dict) -> StreamManager:
 
 
 def setup_manager(config: dict) -> StreamManager:
-    # Parâmetros vindos do TOML
+    # Configura os limites globais
     manager.configure(
         timeout=config["acquisition"].get("max_runtime_sec"),
         total_samples=config["acquisition"].get("total_samples"),
@@ -64,6 +75,17 @@ def setup_manager(config: dict) -> StreamManager:
     session_limit = config["acquisition"].get("total_samples", 1000000)
     buffer_limit = config["acquisition"].get("buffer_samples", 1000)
     timeseries_limit = config["acquisition"].get("timeseries_samples", 480)
+
+    # Adiciona o SheetsHandler para a coluna de tempo (Coluna A da Planilha)
+    ts_handler = SheetsHandler(
+        data=DataStream(total_samples=session_limit),
+        data_buffer=DataStream(total_samples=buffer_limit),
+        time_series=DataStream(total_samples=timeseries_limit),
+        name="timestamp",
+        adc_max=0,
+        v_ref=0.0
+    )
+    manager.add_handler("timestamp", ts_handler)
 
     for sensor in config.get('sensors', []):
         sensor_model = sensor.get("model")
@@ -88,7 +110,7 @@ def setup_manager(config: dict) -> StreamManager:
         )
         manager.add_handler(name, handler)
 
-    if len(manager) == 0:
+    if len(manager) <= 1:
         raise RuntimeError(
             "Nenhum sensor válido foi configurado para aquisição.")
 

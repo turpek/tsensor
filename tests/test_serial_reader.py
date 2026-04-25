@@ -69,8 +69,10 @@ def test_sheets_reading_success_loop(mocker):
 
     # Verificações
     mock_sheet_inst.setup.assert_called_once()
-    assert mock_manager.dispatch_sheets.call_count == 2
-    mock_manager.dispatch_sheets.assert_any_call(["10:00:00", "25.0"])
+    assert mock_manager.dispatch.call_count == 2
+    # Verifica se o primeiro argumento da chamada foi um iterador (não comparamos o objeto iterador diretamente)
+    args, _ = mock_manager.dispatch.call_args
+    assert isinstance(args[0], type(iter([])))
 
 
 def test_sheets_reading_quota_error_handling(mocker):

@@ -88,7 +88,13 @@ def export_data():
 
         for name in sensor_names:
             ds = manager._handlers[name].data
-            samples = list(zip(ds.timestamp, ds.samples))
+            
+            # Se for o handler de timestamp, formata os valores Unix para string legível
+            if name == "timestamp":
+                samples = [datetime.fromtimestamp(v).strftime("%H:%M:%S.%f")[:-3] for v in ds.samples]
+            else:
+                samples = list(ds.samples)
+                
             sensor_data[name] = samples
             if len(samples) > max_len:
                 max_len = len(samples)
@@ -96,20 +102,16 @@ def export_data():
         if max_len == 0:
             return jsonify({"error": "Não há dados para exportar."}), 400
 
-        # Constrói o cabeçalho dinâmico e a linha de comentário para identificação
+        # Constrói o cabeçalho dinâmico
         header = []
-        comment_parts = []
         for name in sensor_names:
-            # Pega o tipo para o cabeçalho (ex: temperature, pressure)
+            if name == "timestamp":
+                header.append("timestamp")
+                continue
             sensor_config = next(
                 (s for s in config["sensors"] if s["name"] == name), {})
             s_type = sensor_config.get("type", "valor")
-
-            header.extend(["timestamp", s_type])
-            # Espaçamento para as duas colunas
-            comment_parts.append(f"{name}; ")
-
-        comment_line = "; ".join(comment_parts)
+            header.append(s_type)
 
         # Prepara as linhas alinhando as amostras
         rows = []
@@ -118,21 +120,19 @@ def export_data():
             for name in sensor_names:
                 samples = sensor_data[name]
                 if i < len(samples):
-                    row.extend([samples[i][0], samples[i][1]])
+                    row.append(samples[i])
                 else:
-                    # Padding para sensores com menos amostras
-                    row.extend(["", ""])
+                    row.append("")
             rows.append(row)
 
         exporter = CSVExporter(directory=export_dir, header=header)
         exporter.setup()
 
-        from datetime import datetime
         file_name = f"sessao_paralela_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
         # Exporta com separador ';' e linha de comentário
         success = exporter.export(
-            rows, file_name, sep=";", comment=comment_line)
+            rows, file_name, sep=";", comment=f"Exportação TSENSOR - {', '.join(sensor_names)}")
 
         if success:
             n = len(sensor_names)
@@ -267,15 +267,22 @@ def get_stats():
 def get_histogram():
     all_histograms = {}
 
+    # Busca o handler de timestamp para gerar os labels globais
+    ts_handler = manager.get_handler("timestamp")
+    labels_globais = []
+    if ts_handler:
+        labels_globais = [
+            datetime.fromtimestamp(v).strftime("%H:%M:%S") 
+            for v in ts_handler.time_series.samples
+        ]
+
     for name, handler in manager._handlers.items():
         buffer = handler.data_buffer
 
         # Só move para o histórico (time_series) se o buffer atingiu o limite configurado (is_full)
         if buffer.is_full:
-            # Extrai o timestamp da última amostra do buffer
-            last_ts = buffer.timestamp[-1] if buffer.timestamp else None
             # Adiciona a média do bloco ao histórico temporal
-            handler.time_series.add(buffer.mean, timestamp=last_ts)
+            handler.time_series.add(buffer.mean)
             # Limpa o buffer para o próximo bloco
             buffer.clear()
 
@@ -300,7 +307,7 @@ def get_histogram():
             residual_data = {"labels": [], "values": [], "std": 0}
 
         all_histograms[name] = {
-            "labels": list(handler.time_series.timestamp),
+            "labels": labels_globais,
             "values": list(handler.time_series.samples),
             "histogram": {
                 "labels": list(hist_dict.keys()),
@@ -331,11 +338,23 @@ def download_charts_zip():
     # Mapeamento de unidades
     units = {"temperature": "°C", "pressure": "kPa"}
 
+    # Busca o handler de timestamp para gerar os labels globais
+    ts_handler = manager.get_handler("timestamp")
+    labels_globais = []
+    if ts_handler:
+        labels_globais = [
+            datetime.fromtimestamp(v).strftime("%H:%M:%S") 
+            for v in ts_handler.time_series.samples
+        ]
+
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w") as zf:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         for name, handler in manager._handlers.items():
+            if name == "timestamp":
+                continue
+
             safe_name = name.replace(" ", "_")
 
             # Busca o tipo do sensor no config para determinar a unidade
@@ -345,11 +364,11 @@ def download_charts_zip():
             unit = units.get(s_type, "")
 
             # 1. Gráfico de Série Temporal (Suavizado com Spline)
-            data_points = list(
-                zip(handler.time_series.timestamp, handler.time_series.samples))
-            if data_points:
-                labels = [p[0] for p in data_points]
-                values = np.array([p[1] for p in data_points])
+            if labels_globais and len(handler.time_series.samples) > 0:
+                # Usa os labels globais (ajustados ao tamanho das amostras do sensor se necessário)
+                n_samples = len(handler.time_series.samples)
+                labels = labels_globais[:n_samples]
+                values = np.array(handler.time_series.samples[:n_samples])
                 indices = np.arange(len(values))
 
                 plt.figure(figsize=(10, 6), dpi=100)
@@ -388,7 +407,7 @@ def download_charts_zip():
                 plt.savefig(img_io, format="png", facecolor="white")
                 plt.close()
                 zf.writestr(
-                    f"serie_temporal_{safe_name}_{timestamp}.png", img_io.getvalue())
+                    f"serie_temporal_{safe_name}_{timestamp_str}.png", img_io.getvalue())
 
             # 2. Histograma Global
             data_raw = np.array(handler.data.samples)
@@ -407,7 +426,7 @@ def download_charts_zip():
                 plt.savefig(img_io, format="png", facecolor="white")
                 plt.close()
                 zf.writestr(
-                    f"histograma_{safe_name}_{timestamp}.png", img_io.getvalue())
+                    f"histograma_{safe_name}_{timestamp_str}.png", img_io.getvalue())
 
             # 3. Gráfico de Resíduos (Detrended)
             if len(data_raw) > 1:
@@ -427,7 +446,7 @@ def download_charts_zip():
                 plt.savefig(img_io, format="png", facecolor="white")
                 plt.close()
                 zf.writestr(
-                    f"residuos_{safe_name}_{timestamp}.png", img_io.getvalue())
+                    f"residuos_{safe_name}_{timestamp_str}.png", img_io.getvalue())
 
     zip_buffer.seek(0)
     from flask import send_file

@@ -11,8 +11,8 @@ def test_virtual_serial_readline_format(mocker):
 
     assert isinstance(line, bytes)
     decoded = line.decode().strip()
-    # Agora pode começar com T= ou P= (dependendo de qual sensor vem primeiro na lista)
-    assert any(decoded.startswith(p) for p in ["T=", "P="])
+    # Agora pode começar com T=, P= ou U=
+    assert any(decoded.startswith(p) for p in ["T=", "P=", "U="])
     assert line.endswith(b"\n")
 
 
@@ -33,21 +33,23 @@ def test_virtual_serial_values_within_range(mocker):
 
     v_serial = VirtualSerial("SIM", 115200)
 
-    # Coleta 5 amostras. No novo formato, cada linha deve ter T=... E P=...
+    # Coleta 5 amostras. No novo formato, cada linha deve ter T=... E P=... E U=...
     samples = [v_serial.readline().decode().strip() for _ in range(5)]
 
     for line in samples:
         assert "T=" in line
         assert "P=" in line
+        assert "U=" in line
         assert "," in line
 
-        # Parsing robusto do novo formato T=NUM,P=NUM
-        parts = {p.split("=")[0]: int(p.split("=")[1])
+        # Parsing robusto do novo formato T=NUM,P=NUM,U=NUM (usa float para o timestamp)
+        parts = {p.split("=")[0]: float(p.split("=")[1])
                  for p in line.split(",")}
 
         # Verifica ranges do ESP32 (LM35 ~310, MPS20 ~93556)
         assert 200 < parts["T"] < 400
         assert 90000 < parts["P"] < 96000
+        assert parts["U"] > 1700000000  # Valor coerente com Unix timestamp atual (2024+)
 
 
 def test_serial_factory_selection(mocker):

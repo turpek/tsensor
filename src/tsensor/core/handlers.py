@@ -2,13 +2,12 @@ from abc import ABC, abstractmethod
 from loguru import logger
 from math import log
 from time import time
-from typing import Protocol, Optional
+from typing import Protocol, Optional, Iterator
 from tsensor.core.data_stream import DataStream
-from tsensor.core.utils import timestamp
 
 import re
 
-REG_ADC_VALUE = r"(\d+)"
+REG_ADC_VALUE = r"(\d+\.\d+|\d+)"
 
 
 class SerialHandler(Protocol):
@@ -56,11 +55,11 @@ class SheetsHandler:
         self._time_series = time_series
         self._name = name
 
-    def handle(self, line: str, timestamp: str = '') -> bool:
-        line = float(line)
+    def handle(self, line: Iterator) -> bool:
+        line = float(next(line))
         logger.debug(f"{self._name}: {line:.4f}")
-        self._data.add(line, timestamp)
-        self._data_buffer.add(line, timestamp)
+        self._data.add(line)
+        self._data_buffer.add(line)
         return True
 
     @property
@@ -113,10 +112,9 @@ class PressureHandler(ABC):
         adc = self._str_to_int(line)
         if adc is not None:
             pressure = self._convert(adc)
-            time_now = timestamp()
             logger.debug(f"pressao: {pressure:.4f}")
-            self._data.add(pressure, time_now)
-            self._data_buffer.add(pressure, time_now)
+            self._data.add(pressure)
+            self._data_buffer.add(pressure)
             return True
         return False
 
@@ -169,10 +167,9 @@ class TemperatureHandler(ABC):
         adc = self._str_to_int(line)
         if adc is not None and self._check_adc(adc):
             temperature = self._convert(adc)
-            time_now = timestamp()
             logger.debug(f"temperatura: {temperature:.4f}")
-            self._data.add(temperature, time_now)
-            self._data_buffer.add(temperature, time_now)
+            self._data.add(temperature)
+            self._data_buffer.add(temperature)
             return True
         return False
 
@@ -222,6 +219,51 @@ class MPS20Handler(PressureHandler):
         return round(press, 4)
 
 
+class TimestampHandler:
+
+    def __init__(
+        self,
+        data: DataStream,
+        data_buffer: DataStream,
+        time_series: DataStream,
+        name: str,
+        adc_max: int,
+        v_ref: float,
+    ):
+        self._data = data
+        self._data_buffer = data_buffer
+        self._time_series = time_series
+        self._name = name
+        self._re = re.compile(f"U={REG_ADC_VALUE}")
+
+    def _convert(self, line: str):
+        match = self._re.search(line)
+        if match:
+            ts = float(match.group(1))
+            return round(ts, 4)
+        else:
+            return time()
+
+    def handle(self, line: str) -> bool:
+        line = self._convert(line)
+        logger.debug(f"{self._name}: {line:.4f}")
+        self._data.add(line)
+        self._data_buffer.add(line)
+        return True
+
+    @property
+    def data_buffer(self) -> DataStream:
+        return self._data_buffer
+
+    @property
+    def data(self) -> DataStream:
+        return self._data
+
+    @property
+    def time_series(self) -> DataStream:
+        return self._time_series
+
+
 class StreamManager:
     def __init__(self):
         self._timeout: Optional[int]
@@ -253,18 +295,10 @@ class StreamManager:
     def get_handler(self, name: str) -> None | SerialHandler:
         return self._handlers.get(name)
 
-    def dispatch(self, line: str) -> None:
+    def dispatch(self, line: str | Iterator) -> None:
         counts = [self._count]
         for handler in self._handlers.values():
             handler.handle(line)
-            counts.append(len(handler.data))
-        self._count = max(counts)
-
-    def dispatch_sheets(self, line: str) -> None:
-        counts = [self._count]
-        ts = line[0]
-        for handler, col in zip(self._handlers.values(), line[1:]):
-            handler.handle(col, ts)
             counts.append(len(handler.data))
         self._count = max(counts)
 

@@ -79,12 +79,8 @@ class VirtualSerial:
             val_p = int(random.gauss(target, self.targets["sigma_p"]))
             results.append(f"P={max(0, val_p)}")
 
-        # Se nenhum sensor for identificado (fallback), envia algo aleatório
-        if not results:
-            prefix = random.choice(["T", "P"])
-            target = self.targets["NTC"] if prefix == "T" else self.targets["P"]
-            val = int(random.gauss(target, 1))
-            return f"{prefix}={max(0, val)}\n".encode()
+        # Timestamp (U)
+        results.append(f"U={time.time():.4f}")
 
         return (",".join(results) + "\n").encode()
 

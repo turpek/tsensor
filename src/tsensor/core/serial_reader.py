@@ -46,31 +46,23 @@ def serial_reading(
             first_handler = next(iter(local_manager._handlers.values()))
 
             if len(first_handler.data) >= batch_size:
-                logger.info(f"Exportando lote de {batch_size} amostras...")
+                logger.info(f"Exportando lote de {batch_size} amostras (Modo COLUMNS)...")
 
-                # Prepara os dados: [ [TS, V1, V2...], [...] ]
-                export_data = []
                 handlers = list(local_manager._handlers.values())
 
-                # timestamps e amostras do lote atual
-                tss = handlers[0].data.timestamp
-                samples_matrix = [h.data.samples for h in handlers]
+                # Prepara os dados: cada lista interna é uma COLUNA completa
+                # handlers[0] é o TimestampHandler, os demais são sensores
+                export_data = [list(h.data.samples) for h in handlers]
 
-                for i in range(batch_size):
-                    row = [tss[i]]
-                    for sensor_samples in samples_matrix:
-                        row.append(sensor_samples[i])
-                    export_data.append(row)
-
-                # Avança e exporta
-                export_cursor.major_row(batch_size, 1 + len(handlers))
-                sheet.export(export_data, export_cursor)
+                # Avança o cursor e exporta usando COLUMNS
+                export_cursor.major_row(batch_size, len(handlers))
+                sheet.export(export_data, export_cursor, major_mode='COLUMNS')
 
                 # Limpa os buffers locais
                 for h in handlers:
                     h.data.clear()
 
-                # Reset manual do contador interno do manager local para evitar acúmulo infinito
+                # Reset manual do contador interno do manager local
                 local_manager._count = 0
 
     except Exception as e:
@@ -121,7 +113,7 @@ def sheets_reading(
 
             if lines:
                 for line in lines:
-                    stream_manager.dispatch_sheets(line)
+                    stream_manager.dispatch(iter(line))
 
                 # Se leu menos do que o lote, recua o cursor para a posição da última linha lida
                 if len(lines) < batch_size:

@@ -13,12 +13,23 @@ def mock_handler(mocker):
     handler.data_buffer = DataStream(total_samples=100)
     handler.time_series = DataStream(total_samples=100)
 
-    # Registra o handler no manager real para o loop do endpoint funcionar
-    mocker.patch.dict(manager._handlers, {"Sensor Teste": handler})
+    # Handler de timestamp para labels
+    ts_handler = mocker.Mock()
+    ts_handler.data = DataStream(total_samples=100)
+    ts_handler.data_buffer = DataStream(total_samples=100)
+    ts_handler.time_series = DataStream(total_samples=100)
+
+    # Registra os handlers no manager real
+    mocker.patch.dict(manager._handlers, {
+        "timestamp": ts_handler,
+        "Sensor Teste": handler
+    })
 
     # Mock da configuração correspondente
-    mock_sensor_config = [{"name": "Sensor Teste",
-                           "calibration": {"v_ref": 3.3, "adc_max": 4095}}]
+    mock_sensor_config = [
+        {"name": "timestamp", "model": "Timestamp", "calibration": {}},
+        {"name": "Sensor Teste", "calibration": {"v_ref": 3.3, "adc_max": 4095}}
+    ]
     mocker.patch.dict(config, {"sensors": mock_sensor_config})
 
     mocker.patch("tsensor.routes.api._get_main_handler", return_value=handler)
@@ -43,8 +54,10 @@ def test_api_status_returns_connection_state(client, mocker):
 
 def test_api_stats_returns_html_partial_with_mocked_values(client, mock_handler):
     """Testa a rota /api/stats com valores mockados."""
-    for val in [10.0, 20.0, 30.0, 40.0, 50.0]:
-        mock_handler.data.add(val, timestamp="10:00:00:000")
+    # Adiciona dados para ambos os handlers (timestamp e Sensor Teste)
+    for name in manager._handlers:
+        for val in [10.0, 20.0, 30.0, 40.0, 50.0]:
+            manager._handlers[name].data.add(val)
 
     response = client.get("/api/stats")
 
@@ -54,8 +67,8 @@ def test_api_stats_returns_html_partial_with_mocked_values(client, mock_handler)
 
     # Verifica se o nome do sensor aparece no HTML
     assert "Sensor Teste" in html
-    # Primeiro p.text-2xl é a contagem n
-    assert sel.css("p.text-2xl::text").get() == "5"
+    # Verifica se a contagem '5' aparece (pode haver mais de uma se houver múltiplos sensores)
+    assert "5" in sel.css("p.text-2xl::text").getall()
 
 
 def test_api_stats_empty_stream(client, mock_handler):
@@ -71,10 +84,14 @@ def test_api_histogram_returns_json_with_mocked_values(client, mock_handler):
     """Testa a rota /api/histogram com valores mockados e série temporal."""
     # Adiciona dados ao stream principal
     for val in [10.0, 20.0, 30.0, 40.0, 50.0]:
-        mock_handler.data.add(val, timestamp="10:00:00:000")
+        mock_handler.data.add(val)
 
-    # Simula dados na série temporal (decimada)
-    mock_handler.time_series.add(30.0, timestamp="10:00:05")
+    # Simula dados na série temporal (decimada) e no timestamp handler
+    from datetime import datetime
+    fixed_ts = datetime(2026, 4, 25, 10, 0, 5).timestamp()
+    
+    manager.get_handler("timestamp").time_series.add(fixed_ts)
+    mock_handler.time_series.add(30.0)
 
     response = client.get("/api/histogram")
 
@@ -192,8 +209,11 @@ def test_api_restart_restarts_acquisition(client, mocker):
 
 def test_api_export_success(client, mock_handler, mocker):
     """Verifica se /api/export chama o exportador CSV com colunas paralelas (Wide Format)."""
-    # Adiciona dados reais ao handler registrado no manager
-    mock_handler.data.add(25.0, timestamp="10:00:01")
+    # Adiciona dados reais aos handlers
+    from datetime import datetime
+    fixed_ts = datetime(2026, 4, 25, 10, 0, 1)
+    manager.get_handler("timestamp").data.add(fixed_ts.timestamp())
+    mock_handler.data.add(25.0)
 
     mock_exporter_cls = mocker.patch("tsensor.routes.api.CSVExporter")
     mock_exporter_inst = mock_exporter_cls.return_value
@@ -220,7 +240,7 @@ def test_api_export_success(client, mock_handler, mocker):
 
     # Verifica se os dados foram alinhados lado a lado
     # Como só temos 1 sensor no manager do mock, teremos [ts, val]
-    expected_rows = [["10:00:01", 25.0]]
+    expected_rows = [["10:00:01.000", 25.0]]
     mock_exporter_inst.export.assert_called_once()
     args, kwargs = mock_exporter_inst.export.call_args
     assert args[0] == expected_rows
@@ -248,7 +268,7 @@ def test_api_residual_analysis_success(client, mock_handler):
     test_data = [10.0, 11.0, 12.0, 13.0, 14.0]
 
     for val in test_data:
-        mock_handler.data.add(val, timestamp="10:00:00:000")
+        mock_handler.data.add(val)
 
     response = client.get("/api/residual-analysis")
 
@@ -324,10 +344,15 @@ def test_api_download_charts_zip_success(client, mock_handler, mocker):
     # Mocka o savefig para evitar renderização real (MUITO mais rápido)
     mocker.patch("matplotlib.pyplot.savefig")
 
-    # Popula o handler com dados fictícios para gerar gráficos
+    # Popula os handlers com dados fictícios
+    ts_handler = manager.get_handler("timestamp")
     for i in range(5):
-        mock_handler.data.add(20.0 + i, timestamp=f"10:00:0{i}")
-        mock_handler.time_series.add(20.0 + i, timestamp=f"10:00:0{i}")
+        ts_val = 1714088826.0 + i
+        ts_handler.data.add(ts_val)
+        ts_handler.time_series.add(ts_val)
+        
+        mock_handler.data.add(20.0 + i)
+        mock_handler.time_series.add(20.0 + i)
 
     response = client.get("/api/download-charts-zip")
 
