@@ -15,7 +15,7 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .tab-btn.active { background-color: white; box-shadow: 0 1px 2px rgba(0,0,0,0.05); color: #2563eb; border: 1px solid #e2e8f0; }
-        
+
         /* Remove spinners de inputs numéricos */
         input::-webkit-outer-spin-button,
         input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -24,11 +24,9 @@
 </head>
 <body class="text-slate-900 antialiased">
 
-    <!-- Setup Overlay -->
     <div id="setup-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
         <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-slate-200 overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-300">
-            
-            <!-- Lateral Esquerda: Info & Status -->
+
             <div class="bg-slate-50 p-10 md:w-1/3 border-r border-slate-100 flex flex-col justify-between">
                 <div>
                     <div class="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-200">
@@ -46,13 +44,11 @@
                 </div>
             </div>
 
-            <!-- Lateral Direita: Formulário -->
             <div class="p-8 md:w-2/3 bg-white overflow-y-auto max-h-[85vh] min-h-[580px] relative">
                 <button id="close-setup" class="absolute right-6 top-6 text-slate-400 hover:text-slate-900 transition-colors p-2 hover:bg-slate-50 rounded-full hidden">
                     <i class="bi bi-x-lg text-xl"></i>
                 </button>
 
-                <!-- Tabs Navigation -->
                 <div class="flex gap-2 mb-8 bg-slate-50 p-1.5 rounded-2xl border border-slate-100 w-fit">
                     <button type="button" onclick="switchTab('general')" id="tab-btn-general" class="tab-btn active px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all">
                         <i class="bi bi-gear-wide-connected mr-2"></i>Geral
@@ -75,15 +71,13 @@
                         <span id="setup-error-text"></span>
                     </div>
 
-                    <!-- ABA GERAL -->
                     <div id="tab-content-general" class="tab-content grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
-                        
-                        <!-- Coluna 1: Hardware -->
+
                         <div class="space-y-6">
                             <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                                 <i class="bi bi-cpu"></i> Hardware & Conexão
                             </h3>
-                            
+
                             <div class="space-y-4">
                                 <div>
                                     <label class="block text-[13px] font-bold text-slate-700 mb-1.5 ml-1">Porta Serial</label>
@@ -107,22 +101,21 @@
                             </div>
                         </div>
 
-                        <!-- Coluna 2: Amostragem & Interface -->
                         <div class="space-y-8">
                             <div class="space-y-6">
                                 <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                                     <i class="bi bi-database-down"></i> Amostragem & Limites
                                 </h3>
-                                
+
                                 <div class="space-y-4">
                                     <div class="p-3 bg-slate-50 rounded-2xl border-2 border-slate-100 transition-all focus-within:border-blue-200">
                                         <div class="flex items-center justify-between mb-1.5">
                                             <label class="text-[13px] font-bold text-slate-700">Limite de Amostras</label>
-                                            <input type="checkbox" name="enable_limit_samples" id="chk-limit-samples" 
+                                            <input type="checkbox" name="enable_limit_samples" id="chk-limit-samples"
                                                    class="w-4 h-4 rounded-lg border-2 border-slate-300 text-blue-600 focus:ring-blue-500"
                                                    {% if config.acquisition.total_samples %}checked{% endif %}>
                                         </div>
-                                        <input type="number" name="total_samples" id="input-total-samples" 
+                                        <input type="number" name="total_samples" id="input-total-samples"
                                                value="{{ config.acquisition.total_samples or 1000000 }}"
                                                class="w-full px-0 py-0.5 text-sm bg-transparent outline-none font-extrabold text-blue-600 disabled:text-slate-400 disabled:cursor-not-allowed"
                                                {% if not config.acquisition.total_samples %}disabled{% endif %}>
@@ -135,7 +128,7 @@
                                                    class="w-4 h-4 rounded-lg border-2 border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                                    {% if config.acquisition.max_runtime_sec %}checked{% endif %}>
                                         </div>
-                                        <input type="number" name="max_runtime_sec" id="input-max-runtime" 
+                                        <input type="number" name="max_runtime_sec" id="input-max-runtime"
                                                value="{{ config.acquisition.max_runtime_sec or 1800 }}"
                                                class="w-full px-0 py-0.5 text-sm bg-transparent outline-none font-extrabold text-indigo-600 disabled:text-slate-400 disabled:cursor-not-allowed"
                                                {% if not config.acquisition.max_runtime_sec %}disabled{% endif %}>
@@ -169,7 +162,6 @@
                         </div>
                     </div>
 
-                    <!-- ABA SENSORES -->
                     <div id="tab-content-sensors" class="tab-content hidden space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                         <div class="flex items-center justify-between mb-2">
                             <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
@@ -181,17 +173,15 @@
                         </div>
 
                         <div id="sensors-list" class="space-y-4">
-                            <!-- Inicia vazio. Sensores são adicionados dinamicamente via JS -->
-                        </div>
+                            </div>
                     </div>
 
-                    <!-- ABA DEBUG -->
                     <div id="tab-content-debug" class="tab-content hidden space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
                         <div class="space-y-6">
                             <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                                 <i class="bi bi-terminal-fill"></i> Modo Avançado & Diagnóstico
                             </h3>
-                            
+
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div class="p-5 bg-amber-50 rounded-2xl border-2 border-amber-100">
                                     <div class="flex items-center justify-between mb-2">
@@ -244,7 +234,6 @@
         </div>
     </div>
 
-    <!-- Navegação -->
     <nav class="bg-slate-900 text-white shadow-2xl mb-8">
         <div class="max-w-7xl mx-auto px-8 py-4 flex justify-between items-center">
             <div class="flex items-center gap-6">
@@ -252,8 +241,7 @@
                     <i class="bi bi-cpu text-blue-500 text-2xl"></i>
                     <h1 class="text-xl font-black tracking-tighter">TSENSOR <span class="text-blue-500 text-xs font-normal uppercase tracking-[0.3em] ml-2 opacity-70">Lab</span></h1>
                 </div>
-                
-                <!-- Indicadores de Status em Tempo Real -->
+
                 <div id="latency-badge" class="hidden md:flex items-center gap-4 border-l border-white/10 pl-6 opacity-60">
                     <div class="flex items-center gap-2">
                         <i class="bi bi-reception-4 text-xs text-blue-400"></i>
@@ -265,9 +253,6 @@
             <div class="flex items-center gap-3 font-bold text-[11px] uppercase tracking-wider">
                 <button id="save-charts-btn" class="bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 px-4 py-2 rounded-xl transition-all border border-emerald-500/20 active:scale-95"><i class="bi bi-download mr-2"></i>Salvar Gráficos</button>
                 <button id="start-serial-btn" class="bg-orange-600/10 hover:bg-orange-600/20 text-orange-500 px-4 py-2 rounded-xl transition-all border border-orange-500/20 active:scale-95"><i class="bi bi-lightning-charge-fill mr-2"></i>Tempo Real</button>
-                <button id="export-btn" class="bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 px-4 py-2 rounded-xl transition-all border border-blue-500/20 active:scale-95"><i class="bi bi-cloud-arrow-up mr-2"></i>Exportar</button>
-                <button id="stop-acquisition-btn" class="bg-amber-600/10 hover:bg-amber-600/20 text-amber-500 px-4 py-2 rounded-xl transition-all border border-amber-500/20 active:scale-95"><i class="bi bi-stop-circle mr-2"></i>Parar</button>
-                <button id="restart-hardware-btn" class="bg-red-600/10 hover:bg-red-600/20 text-red-500 px-4 py-2 rounded-xl transition-all border border-red-500/20 active:scale-95"><i class="bi bi-arrow-clockwise mr-2"></i>Reiniciar</button>
                 <button id="open-setup" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl transition-all border border-slate-700 active:scale-95"><i class="bi bi-gear-fill mr-2"></i>Ajustes</button>
             </div>
         </div>
@@ -279,7 +264,6 @@
             <p class="text-slate-400 text-sm font-medium italic">Dados em tempo real</p>
         </header>
 
-        <!-- Container de Sensores (Renderizado estaticamente pelo Jinja para evitar flicker) -->
         <div id="dashboard-content" class="space-y-12">
             {% for sensor in config.sensors %}
             <div id="sensor-group-{{ sensor.name|replace(' ', '-') }}" class="sensor-stats-group lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 pb-12 border-b-2 border-slate-100 last:border-b-0">
@@ -291,7 +275,6 @@
                     <div class="h-[3px] flex-1 bg-gradient-to-l from-transparent to-slate-200"></div>
                 </div>
 
-                <!-- Cartão de Latência (Exibido apenas no primeiro sensor) -->
                 {% if loop.first %}
                 <div class="bg-slate-900 p-5 rounded-2xl shadow-xl text-center transition-all hover:scale-[1.02] border-t-4 border-t-emerald-500">
                     <h3 class="text-slate-500 text-[9px] font-black uppercase mb-1 tracking-widest">Latência Total</h3>
@@ -321,9 +304,7 @@
                 </div>
 
                 <div class="col-span-full mt-12 space-y-8 max-w-7xl mx-auto w-full">
-                    <!-- Linha Superior: Histogramas Lado a Lado -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <!-- Histograma Global -->
                         <div class="space-y-4">
                             <div class="flex items-center gap-2 ml-6">
                                 <div class="w-1.5 h-4 bg-blue-500 rounded-full"></div>
@@ -334,7 +315,6 @@
                             </div>
                         </div>
 
-                        <!-- Análise Residual (Ruído) -->
                         <div class="space-y-4">
                             <div class="flex items-center gap-2 ml-6">
                                 <div class="w-1.5 h-4 bg-orange-500 rounded-full"></div>
@@ -346,7 +326,6 @@
                         </div>
                     </div>
 
-                    <!-- Linha Inferior: Série Temporal (Full Width) -->
                     <div class="space-y-4">
                         <div class="flex items-center gap-2 ml-6">
                             <div class="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
@@ -366,7 +345,6 @@
             {% endfor %}
         </div>
 
-        <!-- Gatilho de Polling Único (JSON para Stats e Histogramas) -->
         <div id="dashboard-trigger" class="hidden" c-container="/api/histogram" c-type="json" c-callback="updateDashboardValues"></div>
     </main>
 
@@ -385,10 +363,10 @@
             const toast = document.createElement('div');
             const bg = type === 'success' ? 'bg-slate-900' : 'bg-red-600';
             const icon = type === 'success' ? 'bi-check-circle-fill text-green-400' : 'bi-exclamation-octagon-fill text-white';
-            
+
             toast.className = `${bg} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right-full duration-300 font-bold text-xs border border-white/10`;
             toast.innerHTML = `<i class="bi ${icon} text-base"></i> <span>${message}</span>`;
-            
+
             container.appendChild(toast);
             setTimeout(() => {
                 toast.classList.add('animate-out', 'fade-out', 'slide-out-to-right-full');
@@ -417,11 +395,11 @@
             const sensorName = select ? select.value : '';
             const overlay = document.getElementById('residual-overlay');
             overlay.classList.remove('hidden');
-            
+
             try {
                 const res = await fetch(`/api/residual-analysis?sensor=${encodeURIComponent(sensorName)}`);
                 const data = await res.json();
-                
+
                 if (data.error) {
                     showToast(data.error, 'error');
                     overlay.classList.add('hidden');
@@ -460,17 +438,17 @@
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            plugins: { 
+                            plugins: {
                                 legend: { display: false },
                                 tooltip: { callbacks: { label: (ctx) => `${ctx.raw} ocorrências` } }
                             },
                             scales: {
-                                y: { 
-                                    beginAtZero: true, 
+                                y: {
+                                    beginAtZero: true,
                                     grid: { color: '#f1f5f9' },
                                     title: { display: true, text: 'Frequência', font: { size: 10, weight: 'bold' } }
                                 },
-                                x: { 
+                                x: {
                                     grid: { display: false },
                                     title: { display: true, text: `Desvio (${unit})`, font: { size: 10, weight: 'bold' } }
                                 }
@@ -529,7 +507,7 @@
             const sensorName = data ? data.name : "";
             const sensorType = data ? data.type : "";
             const sensorModel = data ? data.model : "";
-            
+
             const adcx = data ? data.calibration.adc_max : p.adc;
             const vref = data ? data.calibration.v_ref : p.vref;
             const offset = (data && data.calibration.offset) ? data.calibration.offset : 22.6;
@@ -551,16 +529,16 @@
                         </div>
                         <div>
                             <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Identificador Único</label>
-                            <input type="text" name="sensor_name" placeholder="Ex: Sensor Tanque A" value="${sensorName}" 
+                            <input type="text" name="sensor_name" placeholder="Ex: Sensor Tanque A" value="${sensorName}"
                                    class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-bold">
                         </div>
                     </div>
-                    
+
                     <div class="space-y-4">
                         <div>
                             <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Modelo de Hardware</label>
-                            <select name="sensor_model" 
-                                    onchange="toggleCalibrationFields(this)" 
+                            <select name="sensor_model"
+                                    onchange="toggleCalibrationFields(this)"
                                     class="w-full px-3 py-2 text-sm border-2 border-white rounded-xl focus:border-blue-500 outline-none bg-white font-semibold cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
                                     ${!sensorType ? 'disabled' : ''}>
                                 <option value="" disabled ${!sensorModel ? 'selected' : ''}>Selecione o Hardware</option>
@@ -578,7 +556,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="space-y-4 calibration-extra ${sensorModel !== 'MPS20N0040D' ? 'hidden' : ''}">
                         <div>
                             <label class="block text-[11px] font-black text-slate-500 uppercase mb-1.5 ml-1">Offset (mV)</label>
@@ -602,7 +580,7 @@
             const category = categorySelect.value;
 
             hardwareSelect.innerHTML = `<option value="" disabled selected>Selecione o Hardware</option>`;
-            
+
             if (category && SENSOR_CATEGORIES[category]) {
                 SENSOR_CATEGORIES[category].forEach(h => {
                     const opt = document.createElement('option');
@@ -625,7 +603,7 @@
             const card = select.closest('.sensor-card');
             const core = card.querySelector('.calibration-core');
             const extra = card.querySelector('.calibration-extra');
-            
+
             if (select.value) {
                 core.classList.remove('opacity-30', 'pointer-events-none');
             } else {
@@ -645,23 +623,23 @@
             callbacks: {
                 updateDashboardValues: (response) => {
                     if (!response || !response.sensors) return;
-                    
+
                     const sensors = {{ config.sensors | tojson }};
                     const status = response.status;
-                    
+
                     // Atualiza Latência apenas se houver novos dados
                     if (status && status.fetch_time > lastFetchTime) {
                         const latencyBadge = document.getElementById('latency-badge');
                         const latencyValue = document.getElementById('latency-value');
                         const latencyPanel = document.getElementById('latency-val-panel');
-                        
+
                         // O atraso total é a diferença entre AGORA e o momento em que o dado
                         // foi lido, somado ao atraso que ele já tinha no lote (batch_latency).
                         // Matematicamente: Date.now() - (fetch_time - batch_latency)
                         const totalLagMs = Date.now() - (status.reference_time * 1000);
 
                         if (latencyBadge) latencyBadge.classList.remove('hidden');
-                        
+
                         let text, className;
                         if (totalLagMs < 1000) {
                             text = `${totalLagMs.toFixed(0)}ms`;
@@ -675,12 +653,12 @@
                             latencyValue.innerText = text;
                             latencyValue.className = `text-xs font-mono font-black ${className}`;
                         }
-                        
+
                         if (latencyPanel) {
                             latencyPanel.innerText = text;
                             latencyPanel.className = `text-2xl font-mono font-black ${className}`;
                         }
-                        
+
                         lastFetchTime = status.fetch_time;
                     }
 
@@ -711,18 +689,18 @@
                                 chartInstances[name] = new Chart(ctx, {
                                     type: 'bar',
                                     data: { labels: data.histogram.labels, datasets: [{ data: data.histogram.values, backgroundColor: 'rgba(59, 130, 246, 0.7)', borderRadius: 12 }] },
-                                    options: { 
-                                        responsive: true, 
-                                        maintainAspectRatio: false, 
-                                        animation: false, 
-                                        plugins: { 
+                                    options: {
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        animation: false,
+                                        plugins: {
                                             legend: { display: false },
                                             tooltip: { callbacks: { label: (ctx) => `${ctx.raw} ocorrências` } }
-                                        }, 
-                                        scales: { 
-                                            y: { beginAtZero: true, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Frequência', font: { size: 10, weight: 'bold' } } }, 
-                                            x: { grid: { display: false }, ticks: { font: { size: 9 } }, title: { display: true, text: `Valor (${unit})`, font: { size: 10, weight: 'bold' } } } 
-                                        } 
+                                        },
+                                        scales: {
+                                            y: { beginAtZero: true, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Frequência', font: { size: 10, weight: 'bold' } } },
+                                            x: { grid: { display: false }, ticks: { font: { size: 9 } }, title: { display: true, text: `Valor (${unit})`, font: { size: 10, weight: 'bold' } } }
+                                        }
                                     }
                                 });
                             }
@@ -739,26 +717,26 @@
                             } else {
                                 timeChartInstances[name] = new Chart(ctx, {
                                     type: 'line',
-                                    data: { 
-                                        labels: data.labels, 
-                                        datasets: [{ 
-                                            data: data.values, 
-                                            borderColor: '#6366f1', 
+                                    data: {
+                                        labels: data.labels,
+                                        datasets: [{
+                                            data: data.values,
+                                            borderColor: '#6366f1',
                                             backgroundColor: 'rgba(99, 102, 241, 0.1)',
                                             fill: true,
                                             tension: 0.4,
                                             pointRadius: 0,
                                             borderWidth: 3
-                                        }] 
+                                        }]
                                     },
-                                    options: { 
-                                        responsive: true, 
-                                        maintainAspectRatio: false, 
-                                        animation: false, 
-                                        plugins: { legend: { display: false } }, 
-                                        scales: { 
-                                            y: { grid: { color: '#f1f5f9' }, title: { display: true, text: `Valor (${unit})`, font: { size: 10, weight: 'bold' } } }, 
-                                            x: { 
+                                    options: {
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        animation: false,
+                                        plugins: { legend: { display: false } },
+                                        scales: {
+                                            y: { grid: { color: '#f1f5f9' }, title: { display: true, text: `Valor (${unit})`, font: { size: 10, weight: 'bold' } } },
+                                            x: {
                                                 display: true,
                                                 grid: { display: false },
                                                 ticks: {
@@ -771,8 +749,8 @@
                                                         return label ? label.substring(0, 8) : '';
                                                     }
                                                 }
-                                            } 
-                                        } 
+                                            }
+                                        }
                                     }
                                 });
                             }
@@ -789,27 +767,27 @@
                             } else {
                                 residualChartInstances[name] = new Chart(ctx, {
                                     type: 'bar',
-                                    data: { 
-                                        labels: data.residual.labels, 
-                                        datasets: [{ 
-                                            label: 'Ruído', 
-                                            data: data.residual.values, 
-                                            backgroundColor: 'rgba(249, 115, 22, 0.7)', 
-                                            borderRadius: 8 
-                                        }] 
+                                    data: {
+                                        labels: data.residual.labels,
+                                        datasets: [{
+                                            label: 'Ruído',
+                                            data: data.residual.values,
+                                            backgroundColor: 'rgba(249, 115, 22, 0.7)',
+                                            borderRadius: 8
+                                        }]
                                     },
-                                    options: { 
-                                        responsive: true, 
-                                        maintainAspectRatio: false, 
-                                        animation: false, 
-                                        plugins: { 
+                                    options: {
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        animation: false,
+                                        plugins: {
                                             legend: { display: false },
                                             tooltip: { callbacks: { label: (ctx) => `${ctx.raw} amostras` } }
-                                        }, 
-                                        scales: { 
-                                            y: { beginAtZero: true, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Freq', font: { size: 9 } } }, 
-                                            x: { grid: { display: false }, ticks: { font: { size: 8 } }, title: { display: true, text: `Desvio (${unit})`, font: { size: 9 } } } 
-                                        } 
+                                        },
+                                        scales: {
+                                            y: { beginAtZero: true, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Freq', font: { size: 9 } } },
+                                            x: { grid: { display: false }, ticks: { font: { size: 8 } }, title: { display: true, text: `Desvio (${unit})`, font: { size: 9 } } }
+                                        }
                                     }
                                 });
                             }
@@ -854,7 +832,7 @@
 
             document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                
+
                 const errBox = document.getElementById('setup-error');
                 const errText = document.getElementById('setup-error-text');
                 const sensorCards = document.querySelectorAll('.sensor-card');
@@ -922,13 +900,13 @@
                 }
 
                 errBox.classList.add('hidden');
-                
+
                 const res = await fetch('/api/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                
+
                 const result = await res.json();
                 if (result.success) {
                     showToast("Configurações salvas!");
@@ -944,12 +922,12 @@
                 const originalHTML = btn.innerHTML;
                 btn.disabled = true;
                 btn.innerHTML = '<i class="bi bi-hourglass-split animate-spin mr-2"></i>PROCESSANDO NO SERVIDOR...';
-                
+
                 try {
                     // O download via backend é mais simples: basta redirecionar ou usar window.open
                     // Mas para manter o feedback visual, usamos fetch e convertemos o blob
                     const response = await fetch('/api/download-charts-zip');
-                    
+
                     if (!response.ok) {
                         const errorData = await response.json();
                         throw new Error(errorData.error || "Erro ao gerar gráficos.");
@@ -964,7 +942,7 @@
                     a.click();
                     window.URL.revokeObjectURL(url);
                     a.remove();
-                    
+
                     showToast("ZIP gerado com Matplotlib!");
                 } catch (err) {
                     console.error(err);
@@ -973,21 +951,6 @@
                     btn.disabled = false;
                     btn.innerHTML = originalHTML;
                 }
-            });
-
-            document.getElementById('export-btn').addEventListener('click', async () => {
-                const btn = document.getElementById('export-btn');
-                btn.disabled = true;
-                try {
-                    const res = await fetch('/api/export', { method: 'POST' });
-                    const result = await res.json();
-                    if (result.success) {
-                        showToast(result.message || "Exportação concluída!");
-                    } else {
-                        showToast(result.error, 'error');
-                    }
-                } catch (e) { showToast("Erro de comunicação.", 'error'); }
-                btn.disabled = false;
             });
 
             document.getElementById('start-serial-btn').addEventListener('click', async () => {
@@ -1005,27 +968,9 @@
                 btn.disabled = false;
             });
 
-            document.getElementById('stop-acquisition-btn').addEventListener('click', async () => {
-                try {
-                    const res = await fetch('/api/stop', { method: 'POST' });
-                    const result = await res.json();
-                    if (result.success) {
-                        showToast("Aquisição interrompida.");
-                    } else {
-                        showToast(result.error, 'error');
-                    }
-                } catch (e) { showToast("Erro de comunicação.", 'error'); }
-            });
-
-            document.getElementById('restart-hardware-btn').addEventListener('click', async () => {
-                if (!confirm("Isso irá apagar todos os dados e reiniciar a conexão. Continuar?")) return;
-                await fetch('/api/restart', { method: 'POST' });
-                window.location.reload();
-            });
-
             document.getElementById('open-setup').addEventListener('click', () => document.getElementById('setup-overlay').classList.remove('hidden'));
             document.getElementById('close-setup').addEventListener('click', () => document.getElementById('setup-overlay').classList.add('hidden'));
-            
+
             document.addEventListener('keydown', (e) => {
                 const setupOverlay = document.getElementById('setup-overlay');
                 if (e.key === 'Escape') {
