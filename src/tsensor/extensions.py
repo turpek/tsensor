@@ -5,9 +5,21 @@ from tsensor.core.handlers import StreamManager, HANDLERS, SheetsHandler, Timest
 from tsensor.core.utils import load_config
 
 import threading
+import os
 
 # Carrega as configurações globais
 config = load_config()
+
+# Tenta carregar latência média persistida
+_initial_latency = 0.0
+_latency_cache = os.path.join("exports", ".latency_cache")
+if os.path.exists(_latency_cache):
+    try:
+        with open(_latency_cache, "r") as f:
+            _initial_latency = float(f.read().strip())
+    except Exception:
+        pass
+
 manager = StreamManager()
 
 # Instância e configuração global do SheetsManager
@@ -124,7 +136,7 @@ app_status = {
     "connected": False,
     "port": config["hardware"]["port"],
     "mcu": config["hardware"]["mcu"],
-    "batch_latency": 0.0,
+    "batch_latency": _initial_latency,
     "fetch_time": 0.0,
     "error": None,
 }

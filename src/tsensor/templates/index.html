@@ -282,7 +282,7 @@
         <!-- Container de Sensores (Renderizado estaticamente pelo Jinja para evitar flicker) -->
         <div id="dashboard-content" class="space-y-12">
             {% for sensor in config.sensors %}
-            <div id="sensor-group-{{ sensor.name|replace(' ', '-') }}" class="sensor-stats-group lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pb-12 border-b-2 border-slate-100 last:border-b-0">
+            <div id="sensor-group-{{ sensor.name|replace(' ', '-') }}" class="sensor-stats-group lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 pb-12 border-b-2 border-slate-100 last:border-b-0">
                 <div class="col-span-full flex items-center gap-3 mb-4">
                     <div class="h-[3px] flex-1 bg-gradient-to-r from-transparent to-slate-200"></div>
                     <h3 class="text-[11px] font-black text-slate-500 uppercase tracking-[0.4em] bg-white px-6 py-2 rounded-2xl border-2 border-slate-100 shadow-sm">
@@ -291,7 +291,15 @@
                     <div class="h-[3px] flex-1 bg-gradient-to-l from-transparent to-slate-200"></div>
                 </div>
 
-                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 text-center transition-all hover:shadow-md">
+                <!-- Cartão de Latência (Exibido apenas no primeiro sensor) -->
+                {% if loop.first %}
+                <div class="bg-slate-900 p-5 rounded-2xl shadow-xl text-center transition-all hover:scale-[1.02] border-t-4 border-t-emerald-500">
+                    <h3 class="text-slate-500 text-[9px] font-black uppercase mb-1 tracking-widest">Latência Total</h3>
+                    <p id="latency-val-panel" class="text-2xl font-mono font-black text-emerald-400">0ms</p>
+                </div>
+                {% endif %}
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 text-center transition-all hover:shadow-md {% if not loop.first %}lg:col-start-1{% endif %}">
                     <h3 class="text-slate-400 text-[9px] font-black uppercase mb-1 tracking-widest">Amostras</h3>
                     <p id="n-{{ sensor.name|replace(' ', '-') }}" class="text-2xl font-black text-slate-700">-</p>
                 </div>
@@ -645,16 +653,32 @@
                     if (status && status.fetch_time > lastFetchTime) {
                         const latencyBadge = document.getElementById('latency-badge');
                         const latencyValue = document.getElementById('latency-value');
-                        const lag = status.last_latency;
-
-                        latencyBadge.classList.remove('hidden');
+                        const latencyPanel = document.getElementById('latency-val-panel');
                         
-                        if (lag < 1) {
-                            latencyValue.innerText = `${(lag * 1000).toFixed(0)}ms`;
-                            latencyValue.className = 'text-xs font-mono font-black text-emerald-400';
+                        // O atraso total é a diferença entre AGORA e o momento em que o dado
+                        // foi lido, somado ao atraso que ele já tinha no lote (batch_latency).
+                        // Matematicamente: Date.now() - (fetch_time - batch_latency)
+                        const totalLagMs = Date.now() - (status.reference_time * 1000);
+
+                        if (latencyBadge) latencyBadge.classList.remove('hidden');
+                        
+                        let text, className;
+                        if (totalLagMs < 1000) {
+                            text = `${totalLagMs.toFixed(0)}ms`;
+                            className = 'text-emerald-400';
                         } else {
-                            latencyValue.innerText = `${lag.toFixed(2)}s`;
-                            latencyValue.className = `text-xs font-mono font-black ${lag > 5 ? 'text-red-400' : 'text-amber-400'}`;
+                            text = `${(totalLagMs / 1000).toFixed(2)}s`;
+                            className = totalLagMs > 5000 ? 'text-red-400' : 'text-amber-400';
+                        }
+
+                        if (latencyValue) {
+                            latencyValue.innerText = text;
+                            latencyValue.className = `text-xs font-mono font-black ${className}`;
+                        }
+                        
+                        if (latencyPanel) {
+                            latencyPanel.innerText = text;
+                            latencyPanel.className = `text-2xl font-mono font-black ${className}`;
                         }
                         
                         lastFetchTime = status.fetch_time;

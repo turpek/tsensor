@@ -324,7 +324,10 @@ def get_histogram():
         }
 
     return jsonify({
-        "status": app_status,
+        "status": {
+            **app_status,
+            "reference_time": app_status["fetch_time"] - app_status["batch_latency"]
+        },
         "sensors": all_histograms
     })
 

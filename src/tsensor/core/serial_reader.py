@@ -121,13 +121,6 @@ def sheets_reading(
 
             if lines:
                 app_status["fetch_time"] = time.time()
-
-                try:
-                    last_mcu_ts = float(lines[-1][0])
-                    app_status["last_latency"] = time.time() - last_mcu_ts
-                except (ValueError, IndexError, TypeError):
-                    pass
-
                 for line in lines:
                     stream_manager.dispatch(iter(line))
 
