@@ -49,7 +49,7 @@ def test_serial_reading_handles_errors(mocker):
 
 def test_sheets_reading_success_loop(mocker):
     """Verifica se sheets_reading consome dados da planilha e respeita o loop."""
-    mocker.patch("tsensor.core.serial_reader.sleep")
+    mocker.patch("tsensor.core.serial_reader.time.sleep")
     
     # Mock do SheetsManager
     mock_sheet_cls = mocker.patch("tsensor.core.serial_reader.SheetsManager")
@@ -77,7 +77,7 @@ def test_sheets_reading_success_loop(mocker):
 
 def test_sheets_reading_quota_error_handling(mocker):
     """Verifica se a função lida com o erro 429 (Quota Exceeded) do Google."""
-    mock_sleep = mocker.patch("tsensor.core.serial_reader.sleep")
+    mock_sleep = mocker.patch("tsensor.core.serial_reader.time.sleep")
     
     mock_sheet_cls = mocker.patch("tsensor.core.serial_reader.SheetsManager")
     mock_sheet_inst = mock_sheet_cls.return_value
@@ -106,7 +106,7 @@ def test_sheets_reading_quota_error_handling(mocker):
 
 def test_sheets_reading_reverts_cursor_when_empty(mocker):
     """Verifica se o cursor volta se não houver dados novos na planilha."""
-    mocker.patch("tsensor.core.serial_reader.sleep")
+    mocker.patch("tsensor.core.serial_reader.time.sleep")
     
     mock_sheet_cls = mocker.patch("tsensor.core.serial_reader.SheetsManager")
     mock_sheet_inst = mock_sheet_cls.return_value

@@ -4,6 +4,8 @@ from tsensor.core.sheets import SheetsManager
 from tsensor.core.handlers import StreamManager, HANDLERS, SheetsHandler, TimestampHandler
 from tsensor.core.utils import load_config
 
+import threading
+
 # Carrega as configurações globais
 config = load_config()
 manager = StreamManager()
@@ -122,5 +124,9 @@ app_status = {
     "connected": False,
     "port": config["hardware"]["port"],
     "mcu": config["hardware"]["mcu"],
+    "batch_latency": 0.0,
+    "fetch_time": 0.0,
     "error": None,
 }
+
+sheets_lock = threading.Semaphore(1)

@@ -323,7 +323,10 @@ def get_histogram():
             }
         }
 
-    return jsonify(all_histograms)
+    return jsonify({
+        "status": app_status,
+        "sensors": all_histograms
+    })
 
 
 matplotlib.use("Agg")  # Backend não interativo para web

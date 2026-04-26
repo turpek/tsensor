@@ -250,3 +250,10 @@ class SheetsManager(DataExporter):
     def metadata(self) -> dict:
         """Retorna os metadados cacheados da última execução de fetch_metadata."""
         return getattr(self, '_metadata', {"rowCount": 0, "columnCount": 0, "header": []})
+
+
+class SheetSleep:
+    def __init__(self, request: int):
+        self._count = 0
+        self._req = request
+        self._time = 1

@@ -247,9 +247,20 @@
     <!-- Navegação -->
     <nav class="bg-slate-900 text-white shadow-2xl mb-8">
         <div class="max-w-7xl mx-auto px-8 py-4 flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                <i class="bi bi-cpu text-blue-500 text-2xl"></i>
-                <h1 class="text-xl font-black tracking-tighter">TSENSOR <span class="text-blue-500 text-xs font-normal uppercase tracking-[0.3em] ml-2 opacity-70">Lab</span></h1>
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-3">
+                    <i class="bi bi-cpu text-blue-500 text-2xl"></i>
+                    <h1 class="text-xl font-black tracking-tighter">TSENSOR <span class="text-blue-500 text-xs font-normal uppercase tracking-[0.3em] ml-2 opacity-70">Lab</span></h1>
+                </div>
+                
+                <!-- Indicadores de Status em Tempo Real -->
+                <div id="latency-badge" class="hidden md:flex items-center gap-4 border-l border-white/10 pl-6 opacity-60">
+                    <div class="flex items-center gap-2">
+                        <i class="bi bi-reception-4 text-xs text-blue-400"></i>
+                        <span class="text-[10px] font-bold uppercase tracking-wider">Latência:</span>
+                        <span id="latency-value" class="text-xs font-mono font-black text-blue-400">0ms</span>
+                    </div>
+                </div>
             </div>
             <div class="flex items-center gap-3 font-bold text-[11px] uppercase tracking-wider">
                 <button id="save-charts-btn" class="bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 px-4 py-2 rounded-xl transition-all border border-emerald-500/20 active:scale-95"><i class="bi bi-download mr-2"></i>Salvar Gráficos</button>
@@ -359,6 +370,7 @@
         let timeChartInstances = {}; // Séries Temporais
         let residualChartInstances = {}; // Análise Residual
         let pollingIntervalId = null;
+        let lastFetchTime = 0; // Controle para atualização de latência
 
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
@@ -623,12 +635,32 @@
 
         $cruConfig({
             callbacks: {
-                updateDashboardValues: (allData) => {
-                    if (!allData) return;
+                updateDashboardValues: (response) => {
+                    if (!response || !response.sensors) return;
                     
                     const sensors = {{ config.sensors | tojson }};
+                    const status = response.status;
                     
-                    for (const [name, data] of Object.entries(allData)) {
+                    // Atualiza Latência apenas se houver novos dados
+                    if (status && status.fetch_time > lastFetchTime) {
+                        const latencyBadge = document.getElementById('latency-badge');
+                        const latencyValue = document.getElementById('latency-value');
+                        const lag = status.last_latency;
+
+                        latencyBadge.classList.remove('hidden');
+                        
+                        if (lag < 1) {
+                            latencyValue.innerText = `${(lag * 1000).toFixed(0)}ms`;
+                            latencyValue.className = 'text-xs font-mono font-black text-emerald-400';
+                        } else {
+                            latencyValue.innerText = `${lag.toFixed(2)}s`;
+                            latencyValue.className = `text-xs font-mono font-black ${lag > 5 ? 'text-red-400' : 'text-amber-400'}`;
+                        }
+                        
+                        lastFetchTime = status.fetch_time;
+                    }
+
+                    for (const [name, data] of Object.entries(response.sensors)) {
                         const safeName = name.replace(/\s+/g, '-');
                         const nEl = document.getElementById(`n-${safeName}`);
                         if (!nEl) continue;

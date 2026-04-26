@@ -2,8 +2,8 @@ from loguru import logger
 from tsensor.core.serial_connection import Serial, SerialException
 from tsensor.core.handlers import StreamManager
 from tsensor.core.sheets import SheetsManager, SpreadSheetRange
-from tsensor.extensions import app_status, config, setup_serial_manager
-from time import sleep
+from tsensor.extensions import app_status, config, setup_serial_manager, sheets_lock
+import time
 
 
 def serial_reading(
@@ -54,14 +54,24 @@ def serial_reading(
                 # handlers[0] é o TimestampHandler, os demais são sensores
                 export_data = [list(h.data.samples) for h in handlers]
 
+                # Calcula a latência do lote (atraso de retenção/transporte)
+                if export_data and export_data[0]:
+                    last_mcu_ts = export_data[0][-1]
+                    app_status["batch_latency"] = time.time() - last_mcu_ts
+
                 # Avança o cursor e exporta usando COLUMNS
-                export_cursor.major_row(batch_size, len(handlers))
-                sheet.export(export_data, export_cursor, major_mode='COLUMNS')
+                stop = 1
+                with sheets_lock:
+                    export_cursor.major_row(batch_size, len(handlers))
+                    sheet.export(export_data, export_cursor, major_mode='COLUMNS')
+                    time.sleep(stop)
+                    stop = 0
 
                 # Limpa os buffers locais
                 for h in handlers:
                     h.data.clear()
 
+                time.sleep(stop)
                 # Reset manual do contador interno do manager local
                 local_manager._count = 0
 
@@ -95,10 +105,6 @@ def sheets_reading(
     # Batch size configurável via TOML (padrão 200)
     batch_size = config["acquisition"].get("serial_batch_size", 200)
 
-    # Tempo de segurança para não estourar a cota de 60 req/min do Google
-    # Valor mínimo de 1.5s entre requisições
-    safe_interval = max(1.5, timeout)
-
     logger.info("Iniciando monitoramento da planilha...")
 
     while stream_manager.is_active:
@@ -107,11 +113,21 @@ def sheets_reading(
             read_cursor.major_row(batch_size, cols)
 
             # Busca dados diretamente
-            result = sheet.fetch_data(read_cursor)
+            with sheets_lock:
+                result = sheet.fetch_data(read_cursor)
+
             value_ranges = result.get('valueRanges', [])
             lines = value_ranges[0].get('values', []) if value_ranges else []
 
             if lines:
+                app_status["fetch_time"] = time.time()
+
+                try:
+                    last_mcu_ts = float(lines[-1][0])
+                    app_status["last_latency"] = time.time() - last_mcu_ts
+                except (ValueError, IndexError, TypeError):
+                    pass
+
                 for line in lines:
                     stream_manager.dispatch(iter(line))
 
@@ -122,18 +138,16 @@ def sheets_reading(
             else:
                 # Nenhuma linha nova encontrada, recua e tenta na próxima iteração
                 read_cursor.revert_rows(batch_size)
+            time.sleep(1)
 
         except Exception as e:
             if "429" in str(e):
                 logger.warning(
                     "Cota da API excedida (429). Aguardando 15 segundos para cooldown...")
-                sleep(15)
+                time.sleep(15)
             else:
                 logger.error(f"Erro durante a leitura do Sheets: {e}")
             read_cursor.revert_rows(batch_size)
-
-        # O SLEEP SEMPRE DEVE OCORRER PARA RESPEITAR A COTA
-        sleep(safe_interval)
 
     logger.info(
         f"Monitoramento Sheets finalizado. Total: {stream_manager.count_samples}")

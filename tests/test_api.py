@@ -99,7 +99,7 @@ def test_api_histogram_returns_json_with_mocked_values(client, mock_handler):
     assert response.is_json
 
     data = response.get_json()
-    sensor_data = data["Sensor Teste"]
+    sensor_data = data["sensors"]["Sensor Teste"]
 
     # Valida Histograma
     assert "histogram" in sensor_data
@@ -120,9 +120,9 @@ def test_api_histogram_empty_stream(client, mock_handler):
     assert response.is_json
 
     data = response.get_json()
-    assert "Sensor Teste" in data
-    assert "histogram" in data["Sensor Teste"]
-    assert sum(data["Sensor Teste"]["histogram"]["values"]) == 0
+    assert "Sensor Teste" in data["sensors"]
+    assert "histogram" in data["sensors"]["Sensor Teste"]
+    assert sum(data["sensors"]["Sensor Teste"]["histogram"]["values"]) == 0
 
 
 def test_api_config_updates_values_and_calls_save(client, mocker):
