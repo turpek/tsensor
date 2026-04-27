@@ -4,10 +4,14 @@ from math import log
 from time import time
 from typing import Protocol, Optional, Iterator
 from tsensor.core.data_stream import DataStream
+from tsensor.core.utils import TSSync
 
 import re
 
 REG_ADC_VALUE = r"(\d+\.\d+|\d+)"
+
+
+sync_time = TSSync()
 
 
 class SerialHandler(Protocol):
@@ -210,16 +214,18 @@ class LM35Handler(TemperatureHandler):
 
 
 class MPS20Handler(PressureHandler):
-    def _convert(self, adc: int):
-        B = 128  # ganho
-        adc_max = 2 ** 24
-        v_ref_milli = self._v_ref * 1000
-        v_sensor_mv = (adc * v_ref_milli) / (B * adc_max)
-        press = (v_sensor_mv) / self._sensitivity
+    def _convert(self, adc: float):
+        # B = 128  # ganho
+        # adc_max = 2 ** 24
+        # v_ref_milli = self._v_ref * 1000
+        # v_sensor_mv = (adc * v_ref_milli) / (B * adc_max)
+        # press = (v_sensor_mv) / self._sensitivity
+        press = adc / 1e3
         return round(press, 4)
 
 
 class TimestampHandler:
+    _re = re.compile(f"U={REG_ADC_VALUE}")
 
     def __init__(
         self,
@@ -234,12 +240,18 @@ class TimestampHandler:
         self._data_buffer = data_buffer
         self._time_series = time_series
         self._name = name
-        self._re = re.compile(f"U={REG_ADC_VALUE}")
 
-    def _convert(self, line: str):
-        match = self._re.search(line)
+    @classmethod
+    def convert(cls, line: str) -> float | None:
+        match = cls._re.search(line)
         if match:
             ts = float(match.group(1))
+            return round(ts, 4)
+
+    def _convert(self, line: str) -> str:
+        match = self._re.search(line)
+        if match:
+            ts = sync_time.get_real(float(match.group(1)))
             return round(ts, 4)
         else:
             return time()

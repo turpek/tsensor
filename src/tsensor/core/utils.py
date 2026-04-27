@@ -1,5 +1,6 @@
 from datetime import datetime
 from math import ceil
+from time import time
 from typing import Optional
 import numpy as np
 import os
@@ -324,3 +325,18 @@ class Stat:
     @property
     def is_full(self) -> bool:
         return self._total_samples == len(self)
+
+
+class TSSync:
+    def __init__(self):
+        self._offset = 0.0
+
+    @property
+    def offset(self):
+        return self._offset
+
+    def set(self, ts: float) -> None:
+        self._offset = time() - ts
+
+    def get_real(self, ts: float) -> float:
+        return ts + self._offset

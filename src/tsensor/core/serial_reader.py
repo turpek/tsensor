@@ -1,9 +1,21 @@
 from loguru import logger
 from tsensor.core.serial_connection import Serial, SerialException
-from tsensor.core.handlers import StreamManager
+from tsensor.core.handlers import StreamManager, sync_time, TimestampHandler
 from tsensor.core.sheets import SheetsManager, SpreadSheetRange
 from tsensor.extensions import app_status, config, setup_serial_manager, sheets_lock
 import time
+
+
+def synchronize_time(ser: Serial) -> None:
+    logger.info("Iniciando a sincronização do tempo...")
+    while True:
+        line = ser.readline().decode("utf-8", errors="ignore").strip()
+        ts = TimestampHandler.convert(line)
+        if ts:
+            sync_time.set(ts)
+            logger.info(f"Tempo sincronizado com offset de {sync_time.offset}")
+            break
+        time.sleep(1)
 
 
 def serial_reading(
@@ -30,6 +42,7 @@ def serial_reading(
     sheet.setup()
     export_cursor = SpreadSheetRange(row=2)
 
+    synchronize_time(ser)
     logger.info(
         f"Iniciando coleta Serial (Modo Batch Export: {batch_size})...")
 
