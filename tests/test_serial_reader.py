@@ -10,8 +10,10 @@ def test_serial_reading_basic_loop(mocker):
     # 1. Mock do Serial
     mock_serial_cls = mocker.patch("tsensor.core.serial_reader.Serial")
     mock_ser_instance = mock_serial_cls.return_value
-    # Fornece um timestamp para sincronização e depois dados de temperatura
-    mock_ser_instance.readline.side_effect = [b"U=1714240000\n", b"T=2500\n", b""]
+    # Fornece timestamps para sincronização (precisa de max_samples=10 agora) e depois dados
+    sync_samples = [b"U=1714240000\n"] * 12
+    data_samples = [b"T=2500\n", b""]
+    mock_ser_instance.readline.side_effect = sync_samples + data_samples
 
     # 2. Mock do StreamManager (Global - usado para controle)
     mock_manager = mocker.Mock(spec=StreamManager)

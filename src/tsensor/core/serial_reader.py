@@ -7,16 +7,35 @@ import time
 
 
 def synchronize_time(ser: Serial) -> None:
-    logger.info("Iniciando a sincronização do tempo...")
+    logger.info("Iniciando a sincronização do tempo (Amostragem Múltipla)...")
     ser.reset_input_buffer()
-    while True:
+    # Descarta a primeira linha potencial incompleta
+    ser.readline()
+
+    offsets = []
+    attempts = 0
+    max_samples = 10
+
+    while len(offsets) < max_samples and attempts < 50:
+        attempts += 1
         line = ser.readline().decode("utf-8", errors="ignore").strip()
-        ts = TimestampHandler.convert(line)
-        if ts:
-            sync_time.set(ts)
-            logger.info(f"Tempo sincronizado com offset de {sync_time.offset}")
-            break
-        time.sleep(1)
+        t_arrival = time.time()
+        ts_mcu = TimestampHandler.convert(line)
+
+        if ts_mcu:
+            # t_arrival = ts_mcu + offset -> offset = t_arrival - ts_mcu
+            offsets.append(t_arrival - ts_mcu)
+            if len(offsets) % 2 == 0:
+                logger.debug(f"Sincronizando... {len(offsets)}/{max_samples}")
+
+    if offsets:
+        # Usamos o mínimo observado para o offset. 
+        # O menor offset representa o pacote que viajou com menor latência USB/Buffer.
+        sync_time.offset = min(offsets)
+        logger.info(f"Tempo sincronizado! Offset: {sync_time.offset:.4f}s (baseado em {len(offsets)} amostras)")
+    else:
+        logger.error("Falha ao sincronizar tempo: nenhum timestamp válido recebido.")
+
 
 
 def serial_reading(

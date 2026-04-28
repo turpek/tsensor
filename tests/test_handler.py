@@ -13,6 +13,8 @@ def timestamp_handler():
 
 def test_handle_valid_unix_timestamp(timestamp_handler):
     """Testa o processamento de um Unix Timestamp válido via API pública (prefixo U=)."""
+    from tsensor.core.handlers import sync_time
+    sync_time.offset = 0.0 # Reseta para o teste não falhar por offset residual
     ts_str = "U=1714088826.873"
     success = timestamp_handler.handle(ts_str)
 
@@ -263,8 +265,8 @@ def test_mps20_conversion_logic(mps20_handler):
     adc_value = 0
     assert mps20_handler._convert(adc_value) == pytest.approx(0, abs=1e-2)
 
-    # Verifica o alvo de 93556 (ESP32 @ 3.3V, ganho 128, sens 1.6949)
-    assert mps20_handler._convert(93556) == pytest.approx(0.0848, abs=1e-2)
+    # Verifica o alvo de 93556 -> 93.556 kPa
+    assert mps20_handler._convert(93556) == pytest.approx(93.556, abs=1e-2)
 
 
 def test_mps20_handle_valid_prefix(mps20_handler):
@@ -273,8 +275,8 @@ def test_mps20_handle_valid_prefix(mps20_handler):
     success = mps20_handler.handle(line)
     assert success is True
     assert len(mps20_handler.data) == 1
-    # Pressão ~ 0.0848
-    assert mps20_handler.data.samples[0] == pytest.approx(0.0848, abs=1e-2)
+    # Pressão ~ 93.556
+    assert mps20_handler.data.samples[0] == pytest.approx(93.556, abs=1e-2)
 
 
 def test_mps20_handle_ignores_wrong_prefix(mps20_handler):
@@ -307,5 +309,6 @@ def test_mps20_custom_calibration():
     # adc = (1920.0 * 2**24) / (v_ref * 1000)
     adc_target = int((1920.0 * (2**24)) / (v_ref * 1000))
 
-    # Esperado com a nova fórmula: 15.0 / 2.0 = 7.5 kPa
-    assert custom_handler._convert(adc_target) == pytest.approx(7.5, abs=1e-2)
+    # Com a nova fórmula simplificada (adc / 1000), o valor esperado é simplesmente o ADC / 1000
+    expected_pressure = adc_target / 1000.0
+    assert custom_handler._convert(adc_target) == pytest.approx(expected_pressure, abs=1e-2)

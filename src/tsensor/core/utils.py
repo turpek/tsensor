@@ -336,6 +336,10 @@ class TSSync:
     def offset(self):
         return self._offset
 
+    @offset.setter
+    def offset(self, value: float):
+        self._offset = value
+
     def set(self, ts: float) -> None:
         self._offset = time() - ts
 
