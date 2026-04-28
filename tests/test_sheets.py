@@ -160,6 +160,26 @@ def test_sheets_manager_fetch_data_calls_batch_get(mock_sheets_deps, mocker):
     assert call_args['ranges'] == ["Página1!A1:B3"]
 
 
+def test_sheets_manager_fetch_data_handles_grid_limits(mock_sheets_deps, mocker):
+    """Verifica se fetch_data retorna vazio ao atingir o limite da grade (EOF simulado)."""
+    manager = SheetsManager()
+    mock_sheet_service = mocker.Mock()
+    manager._sheet = mock_sheet_service
+
+    # Simula a exceção que a Google API lança quando o range está fora do grid
+    mock_sheet_service.values.return_value.batchGet.return_value.execute.side_effect = Exception(
+        "Range exceeds grid limits. Max rows: 100, max columns: 3"
+    )
+
+    sr = SpreadSheetRange(1, 1)
+    sr.major_row(10, 3)
+
+    result = manager.fetch_data(sr)
+
+    # Deve retornar o formato esperado de dados vazios em vez de estourar a exceção
+    assert result == {'valueRanges': []}
+
+
 def test_sheets_manager_fetch_metadata_success(mock_sheets_deps, mocker):
     """Valida a extração de metadados (dimensões e cabeçalho)."""
     manager = SheetsManager()

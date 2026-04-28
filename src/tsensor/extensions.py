@@ -2,13 +2,16 @@ from loguru import logger
 from tsensor.core.data_stream import DataStream
 from tsensor.core.sheets import SheetsManager
 from tsensor.core.handlers import StreamManager, HANDLERS, SheetsHandler, TimestampHandler
-from tsensor.core.utils import load_config
+from tsensor.core.utils import load_config, AcquisitionGate
 
 import threading
 import os
 
 # Carrega as configurações globais
 config = load_config()
+
+# Objeto global para sincronizar as classe de leitura (serial/sheets)
+acq_gate = AcquisitionGate()
 
 # Tenta carregar latência média persistida
 _initial_latency = 0.0
@@ -24,9 +27,11 @@ manager = StreamManager()
 
 # Instância e configuração global do SheetsManager
 sheet_manager = SheetsManager()
-# Expande a planilha conforme as amostras configuradas (+1 para cabeçalho) e 3 colunas (TS, Temp, Pres)
+# Expande a planilha conforme as amostras configuradas (+1 para cabeçalho)
 total_samples = config["acquisition"].get("total_samples", 1000)
-sheet_manager.setup(row_count=total_samples + 1, col_count=3)
+# Dinâmico: Timestamp + Sensores
+col_count = 1 + len(config.get('sensors', []))
+sheet_manager.setup(row_count=total_samples + 1, col_count=col_count)
 
 
 def setup_serial_manager(config: dict) -> StreamManager:

@@ -49,8 +49,7 @@ def test_virtual_serial_values_within_range(mocker):
         # Verifica ranges do ESP32 (LM35 ~310, MPS20 ~93556)
         assert 200 < parts["T"] < 400
         assert 90000 < parts["P"] < 96000
-        assert parts["U"] > 1700000000  # Valor coerente com Unix timestamp atual (2024+)
-
+        assert parts["U"] >= 608200  # Valor simulado do ESP32
 
 def test_serial_factory_selection(mocker):
     """Verifica se o módulo exporta a classe correta baseada na variável de ambiente."""

@@ -246,13 +246,13 @@ class TimestampHandler:
         match = cls._re.search(line)
         if match:
             ts = float(match.group(1))
-            return round(ts, 4)
+            return ts
 
-    def _convert(self, line: str) -> str:
+    def _convert(self, line: str) -> float:
         match = self._re.search(line)
         if match:
             ts = sync_time.get_real(float(match.group(1)))
-            return round(ts, 4)
+            return ts
         else:
             return time()
 

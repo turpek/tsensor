@@ -209,14 +209,21 @@ class SheetsManager(DataExporter):
     ) -> dict:
 
         range_ = f'{name}!{sheet_range.to_a1()}'
-        result = self._sheet.values().batchGet(
-            spreadsheetId=SPREADSHEET_ID,
-            majorDimension=major_mode,
-            ranges=[range_],
-            valueRenderOption='UNFORMATTED_VALUE',
-            dateTimeRenderOption='FORMATTED_STRING'
-        ).execute()
-        return result
+        try:
+            result = self._sheet.values().batchGet(
+                spreadsheetId=SPREADSHEET_ID,
+                majorDimension=major_mode,
+                ranges=[range_],
+                valueRenderOption='UNFORMATTED_VALUE',
+                dateTimeRenderOption='FORMATTED_STRING'
+            ).execute()
+            return result
+        except Exception as e:
+            # Se o erro for por limite de grade (leitura além do fim da planilha),
+            # retorna vazio para que o polling continue tentando sem travar.
+            if "exceeds grid limits" in str(e):
+                return {'valueRanges': []}
+            raise e
 
     def fetch_metadata(self, name: str = 'Página1') -> dict:
         """Obtém metadados da planilha: total de linhas, colunas e o cabeçalho."""

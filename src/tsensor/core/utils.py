@@ -2,6 +2,7 @@ from datetime import datetime
 from math import ceil
 from time import time
 from typing import Optional
+from queue import Queue, Empty
 import numpy as np
 import os
 import toml
@@ -340,3 +341,29 @@ class TSSync:
 
     def get_real(self, ts: float) -> float:
         return ts + self._offset
+
+
+class AcquisitionGate:
+    def __init__(self):
+        self._queue: Optional[Queue] = None
+
+    def enable(self) -> None:
+        """Inicializa a fila para a sincronização dos readers."""
+        if not isinstance(self._queue, Queue):
+            self._queue = Queue()
+
+    def signal(self, value: bool) -> None:
+        """Envia um sinal booleano para a fila."""
+        self._queue.put(value)
+
+    def wait(self, timeout: Optional[float] = 0.5) -> bool:
+        """
+        Aguarda o sinal de sincronização.
+        Se o portão não estiver habilitado, retorna True por padrão.
+        """
+        if isinstance(self._queue, Queue):
+            try:
+                return self._queue.get(timeout=timeout)
+            except Empty:
+                return False
+        return True

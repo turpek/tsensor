@@ -2,12 +2,13 @@ from loguru import logger
 from tsensor.core.serial_connection import Serial, SerialException
 from tsensor.core.handlers import StreamManager, sync_time, TimestampHandler
 from tsensor.core.sheets import SheetsManager, SpreadSheetRange
-from tsensor.extensions import app_status, config, setup_serial_manager, sheets_lock
+from tsensor.extensions import app_status, acq_gate, config, setup_serial_manager, sheets_lock
 import time
 
 
 def synchronize_time(ser: Serial) -> None:
     logger.info("Iniciando a sincronização do tempo...")
+    ser.reset_input_buffer()
     while True:
         line = ser.readline().decode("utf-8", errors="ignore").strip()
         ts = TimestampHandler.convert(line)
@@ -42,17 +43,20 @@ def serial_reading(
     sheet.setup()
     export_cursor = SpreadSheetRange(row=2)
 
+    acq_gate.enable()
     synchronize_time(ser)
     logger.info(
         f"Iniciando coleta Serial (Modo Batch Export: {batch_size})...")
 
     try:
+        ser.reset_input_buffer()
         while stream_manager.is_active:
             line = ser.readline().decode("utf-8", errors="ignore").strip()
-            if not line:
+            if not line or line[0] != '[' or line[-1] != ']':
                 continue
 
             # Despacha APENAS para o manager local (acumulação para Sheets)
+            # print(line)
             local_manager.dispatch(line)
 
             # Assume que todos os handlers têm o mesmo tamanho
@@ -70,21 +74,26 @@ def serial_reading(
                 # Calcula a latência do lote (atraso de retenção/transporte)
                 if export_data and export_data[0]:
                     last_mcu_ts = export_data[0][-1]
-                    app_status["batch_latency"] = time.time() - last_mcu_ts
+                    tf = time.time()
+                    app_status["batch_latency"] = tf - last_mcu_ts
+                    print('ti:', last_mcu_ts)
+                    print('tf:', tf)
+                    print("lat:", app_status['batch_latency'])
 
                 # Avança o cursor e exporta usando COLUMNS
-                stop = 1
                 with sheets_lock:
                     export_cursor.major_row(batch_size, len(handlers))
                     sheet.export(export_data, export_cursor, major_mode='COLUMNS')
-                    time.sleep(stop)
-                    stop = 0
+                    acq_gate.signal(True)
+                    time.sleep(1)
 
                 # Limpa os buffers locais
                 for h in handlers:
                     h.data.clear()
 
-                time.sleep(stop)
+                # Limpa o buffer da serial para garantir que o próximo lote comece com dados recentes
+                # ser.reset_input_buffer()
+
                 # Reset manual do contador interno do manager local
                 local_manager._count = 0
 
@@ -113,7 +122,7 @@ def sheets_reading(
 
     # Cursor de leitura local, iniciando na linha 2 (após cabeçalho)
     read_cursor = SpreadSheetRange(row=2)
-    cols = 1 + len(stream_manager)
+    cols = len(stream_manager)
 
     # Batch size configurável via TOML (padrão 200)
     batch_size = config["acquisition"].get("serial_batch_size", 200)
@@ -122,29 +131,30 @@ def sheets_reading(
 
     while stream_manager.is_active:
         try:
-            # Avança o cursor para o próximo lote
-            read_cursor.major_row(batch_size, cols)
+            if acq_gate.wait(5):
+                # Avança o cursor para o próximo lote
+                read_cursor.major_row(batch_size, cols)
 
-            # Busca dados diretamente
-            with sheets_lock:
-                result = sheet.fetch_data(read_cursor)
+                # Busca dados diretamente
+                with sheets_lock:
+                    result = sheet.fetch_data(read_cursor)
 
-            value_ranges = result.get('valueRanges', [])
-            lines = value_ranges[0].get('values', []) if value_ranges else []
+                value_ranges = result.get('valueRanges', [])
+                lines = value_ranges[0].get('values', []) if value_ranges else []
 
-            if lines:
-                app_status["fetch_time"] = time.time()
-                for line in lines:
-                    stream_manager.dispatch(iter(line))
+                if lines:
+                    app_status["fetch_time"] = time.time()
+                    for line in lines:
+                        stream_manager.dispatch(iter(line))
 
-                # Se leu menos do que o lote, recua o cursor para a posição da última linha lida
-                if len(lines) < batch_size:
-                    unread = batch_size - len(lines)
-                    read_cursor.revert_rows(unread)
-            else:
-                # Nenhuma linha nova encontrada, recua e tenta na próxima iteração
-                read_cursor.revert_rows(batch_size)
-            time.sleep(1)
+                    # Se leu menos do que o lote, recua o cursor para a posição da última linha lida
+                    if len(lines) < batch_size:
+                        unread = batch_size - len(lines)
+                        read_cursor.revert_rows(unread)
+                else:
+                    # Nenhuma linha nova encontrada, recua e tenta na próxima iteração
+                    read_cursor.revert_rows(batch_size)
+                time.sleep(1)
 
         except Exception as e:
             if "429" in str(e):
@@ -152,7 +162,8 @@ def sheets_reading(
                     "Cota da API excedida (429). Aguardando 15 segundos para cooldown...")
                 time.sleep(15)
             else:
-                logger.error(f"Erro durante a leitura do Sheets: {e}")
+                logger.error("Erro crítico durante a leitura do Google Sheets: {e}")
+
             read_cursor.revert_rows(batch_size)
 
     logger.info(

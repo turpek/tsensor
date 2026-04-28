@@ -57,6 +57,8 @@ class VirtualSerial:
         # Carrega latência configurada (Padrão 100ms se ausente)
         latency_us = config["hardware"].get("simulation_latency_us", 100000)
         self.latency = latency_us / 1_000_000.0
+        self._start_ts = 608200.0
+        self._creation_time = time.time()
 
         logger.info(
             f"VIRTUAL SERIAL: Simulando {mcu.upper()} @ {vref}V (Latency: {self.latency:.6f}s)")
@@ -80,7 +82,8 @@ class VirtualSerial:
             results.append(f"P={max(0, val_p)}")
 
         # Timestamp (U)
-        results.append(f"U={time.time():.4f}")
+        current_ts = self._start_ts + (time.time() - self._creation_time)
+        results.append(f"U={current_ts:.4f}")
 
         return (",".join(results) + "\n").encode()
 
