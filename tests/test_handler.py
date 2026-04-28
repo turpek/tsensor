@@ -225,6 +225,35 @@ def test_stream_manager_is_active_based_on_max_samples_per_sensor(stream_manager
     assert stream_manager.count_samples == 10
 
 
+def test_stream_manager_validate_with_matching_handler(stream_manager, ntc_handler):
+    """Verifica se validate retorna True quando um dos handlers reconhece o dado."""
+    stream_manager.add_handler("ntc", ntc_handler)
+    assert stream_manager.validate("T=2048") is True
+
+
+def test_stream_manager_validate_with_multiple_handlers(stream_manager, ntc_handler, mps20_handler):
+    """Verifica se validate funciona com múltiplos tipos de handlers."""
+    stream_manager.add_handler("ntc", ntc_handler)
+    stream_manager.add_handler("pressao", mps20_handler)
+
+    assert stream_manager.validate("T=2048") is True
+    assert stream_manager.validate("P=93556") is True
+    assert stream_manager.validate("U=1714088826") is False  # Nenhum dos dois lida com U=
+
+
+def test_stream_manager_validate_no_match(stream_manager, ntc_handler):
+    """Verifica se validate retorna False quando nenhum handler reconhece o dado."""
+    stream_manager.add_handler("ntc", ntc_handler)
+    assert stream_manager.validate("P=93556") is False
+    assert stream_manager.validate("Lixo") is False
+
+
+def test_stream_manager_validate_invalid_input(stream_manager):
+    """Verifica se validate lida com entradas que não são strings."""
+    assert stream_manager.validate(None) is False
+    assert stream_manager.validate(123) is False
+
+
 # --- TESTES PARA MPS20HANDLER ---
 
 

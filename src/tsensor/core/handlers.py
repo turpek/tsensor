@@ -27,6 +27,9 @@ class SerialHandler(Protocol):
     ):
         ...
 
+    def str_to_float(self, line: str) -> None | float:
+        ...
+
     def handle(self, line: str | float) -> bool:
         ...
 
@@ -66,6 +69,12 @@ class SheetsHandler:
         self._data_buffer.add(line)
         return True
 
+    def str_to_float(self, line: str) -> None | float:
+        try:
+            return float(line)
+        except (ValueError, TypeError):
+            return None
+
     @property
     def data_buffer(self) -> DataStream:
         return self._data_buffer
@@ -99,21 +108,21 @@ class PressureHandler(ABC):
         self._sensitivity = sensitivity
         self._re = re.compile(f"P={REG_ADC_VALUE}")
 
-    def _str_to_int(self, line: str) -> None | int:
+    def str_to_float(self, line: str) -> None | float:
         match = self._re.search(line)
         if match:
-            return int(match.group(1))
+            return float(match.group(1))
         else:
             logger.warning(
                 f"Ruído ou padrão 'P=' não encontrado na linha: '{line}'")
         return None
 
     @abstractmethod
-    def _convert(self, adc: int):
+    def _convert(self, adc: float):
         ...
 
     def handle(self, line: str) -> bool:
-        adc = self._str_to_int(line)
+        adc = self.str_to_float(line)
         if adc is not None:
             pressure = self._convert(adc)
             logger.debug(f"pressao: {pressure:.4f}")
@@ -151,24 +160,24 @@ class TemperatureHandler(ABC):
         self._v_ref = v_ref
         self._re = re.compile(f"T={REG_ADC_VALUE}")
 
-    def _str_to_int(self, line: str) -> None | int:
+    def str_to_float(self, line: str) -> None | float:
         match = self._re.search(line)
         if match:
-            return int(match.group(1))
+            return float(match.group(1))
         else:
             logger.warning(
                 f"Ruído ou padrão 'T=' não encontrado na linha: '{line}'")
         return None
 
-    def _check_adc(self, adc: int) -> bool:
+    def _check_adc(self, adc: float) -> bool:
         return 0 < adc < self._adc_max
 
     @abstractmethod
-    def _convert(self, adc: int):
+    def _convert(self, adc: float):
         ...
 
     def handle(self, line: str) -> bool:
-        adc = self._str_to_int(line)
+        adc = self.str_to_float(line)
         if adc is not None and self._check_adc(adc):
             temperature = self._convert(adc)
             logger.debug(f"temperatura: {temperature:.4f}")
@@ -191,7 +200,7 @@ class TemperatureHandler(ABC):
 
 
 class NTCHandler(TemperatureHandler):
-    def _convert(self, adc: int):
+    def _convert(self, adc: float):
         V = adc * self._v_ref / self._adc_max
         Rfixo = 10000.0
 
@@ -207,7 +216,7 @@ class NTCHandler(TemperatureHandler):
 
 
 class LM35Handler(TemperatureHandler):
-    def _convert(self, adc: int):
+    def _convert(self, adc: float):
         tensao = (adc * self._v_ref) / (self._adc_max)
         temp = tensao * 100.0
         return round(temp, 4)
@@ -247,6 +256,15 @@ class TimestampHandler:
         if match:
             ts = float(match.group(1))
             return ts
+
+    def str_to_float(self, line: str) -> None | float:
+        match = self._re.search(line)
+        if match:
+            try:
+                return float(match.group(1))
+            except (ValueError, TypeError):
+                return None
+        return None
 
     def _convert(self, line: str) -> float:
         match = self._re.search(line)
@@ -306,6 +324,15 @@ class StreamManager:
 
     def get_handler(self, name: str) -> None | SerialHandler:
         return self._handlers.get(name)
+
+    def validate(self, line: str) -> bool:
+        """Verifica se algum handler reconhece o dado na linha."""
+        if not isinstance(line, str):
+            return False
+        for handler in self._handlers.values():
+            if handler.str_to_float(line) is not None:
+                return True
+        return False
 
     def dispatch(self, line: str | Iterator) -> None:
         counts = [self._count]

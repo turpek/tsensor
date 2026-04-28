@@ -52,11 +52,10 @@ def serial_reading(
         ser.reset_input_buffer()
         while stream_manager.is_active:
             line = ser.readline().decode("utf-8", errors="ignore").strip()
-            if not line or line[0] != '[' or line[-1] != ']':
+            if not local_manager.validate(line):
                 continue
 
             # Despacha APENAS para o manager local (acumulação para Sheets)
-            # print(line)
             local_manager.dispatch(line)
 
             # Assume que todos os handlers têm o mesmo tamanho
@@ -76,9 +75,6 @@ def serial_reading(
                     last_mcu_ts = export_data[0][-1]
                     tf = time.time()
                     app_status["batch_latency"] = tf - last_mcu_ts
-                    print('ti:', last_mcu_ts)
-                    print('tf:', tf)
-                    print("lat:", app_status['batch_latency'])
 
                 # Avança o cursor e exporta usando COLUMNS
                 with sheets_lock:
