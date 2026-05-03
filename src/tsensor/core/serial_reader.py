@@ -60,7 +60,9 @@ def serial_reading(
 
     # Gerenciador de exportação local
     sheet = SheetsManager()
-    sheet.setup()
+    total_samples = config["acquisition"].get("total_samples", 1000)
+    col_count = 1 + len(config.get('sensors', []))
+    sheet.setup(row_count=total_samples + 1, col_count=col_count)
     export_cursor = SpreadSheetRange(row=2)
 
     acq_gate.enable()

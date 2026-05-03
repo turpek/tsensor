@@ -135,36 +135,59 @@ class SheetsManager(DataExporter):
         return self._sheet
 
     def _ensure_grid_size(self, rows: int, cols: int, sheet_name: str) -> None:
-        """Ajusta o tamanho da grade da planilha para os valores exatos."""
+        """Ajusta o tamanho da grade da planilha para garantir espaço suficiente, com margem de segurança."""
         try:
-            spreadsheet = self._sheet.get(
-                spreadsheetId=SPREADSHEET_ID).execute()
-            sheet_id = None
-            for s in spreadsheet.get('sheets', []):
-                if s.get('properties', {}).get('title') == sheet_name:
-                    sheet_id = s.get('properties', {}).get('sheetId')
-                    break
+            # Obtém metadados para verificar se o ajuste é realmente necessário
+            meta = self.fetch_metadata(name=sheet_name)
+            current_rows = meta.get("rowCount", 0)
+            current_cols = meta.get("columnCount", 0)
 
-            if sheet_id is not None:
-                body = {
-                    'requests': [{
-                        'updateSheetProperties': {
-                            'properties': {
-                                'sheetId': sheet_id,
-                                'gridProperties': {
-                                    'rowCount': rows,
-                                    'columnCount': cols
-                                }
-                            },
-                            'fields': 'gridProperties(rowCount, columnCount)'
-                        }
-                    }]
-                }
-                self._sheet.batchUpdate(
-                    spreadsheetId=SPREADSHEET_ID, body=body).execute()
+            # Só redimensiona se o alvo for maior que o atual
+            # Adiciona uma folga de 1000 linhas para evitar redimensionamentos frequentes
+            target_rows = max(rows, current_rows)
+            if rows > current_rows:
+                target_rows = rows + 1000
+
+            target_cols = max(cols, current_cols)
+
+            if target_rows > current_rows or target_cols > current_cols:
+                logger.info(
+                    f"Redimensionando planilha para {target_rows}x{target_cols}...")
+                spreadsheet = self._sheet.get(
+                    spreadsheetId=SPREADSHEET_ID).execute()
+                sheet_id = None
+                for s in spreadsheet.get('sheets', []):
+                    if s.get('properties', {}).get('title') == sheet_name:
+                        sheet_id = s.get('properties', {}).get('sheetId')
+                        break
+
+                if sheet_id is not None:
+                    body = {
+                        'requests': [{
+                            'updateSheetProperties': {
+                                'properties': {
+                                    'sheetId': sheet_id,
+                                    'gridProperties': {
+                                        'rowCount': target_rows,
+                                        'columnCount': target_cols
+                                    }
+                                },
+                                'fields': 'gridProperties(rowCount, columnCount)'
+                            }
+                        }]
+                    }
+                    self._sheet.batchUpdate(
+                        spreadsheetId=SPREADSHEET_ID, body=body).execute()
+                    # Atualiza metadados locais após o sucesso
+                    self._metadata["rowCount"] = target_rows
+                    self._metadata["columnCount"] = target_cols
         except Exception as e:
-            logger.warning(
-                f"Ajuste de grade falhou (provavelmente limite de 10M de células): {e}")
+            if "429" in str(e):
+                logger.warning(
+                    "Cota de gravação excedida ao tentar ajustar a grade.")
+            else:
+                logger.warning(
+                    f"Ajuste de grade falhou: {e}")
 
     def export(
         self,
@@ -191,10 +214,14 @@ class SheetsManager(DataExporter):
                 body=body
             ).execute()
         except Exception as e:
-            # Se o erro for por limite de grade, tenta expandir e repetir
+            # Se o erro for por limite de grade, tenta expandir e repetir UMA vez
             if "exceeds grid limits" in str(e):
+                logger.warning(
+                    f"Limite de grade atingido em {sheet_range.to_a1()}. Tentando expandir...")
                 self._ensure_grid_size(
                     sheet_range._end_row, sheet_range._end_col, name)
+
+                # Aguarda um pequeno cooldown se necessário ou apenas tenta novamente
                 return self._sheet.values().batchUpdate(
                     spreadsheetId=SPREADSHEET_ID,
                     body=body
