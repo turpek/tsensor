@@ -89,7 +89,7 @@ def test_api_histogram_returns_json_with_mocked_values(client, mock_handler):
     # Simula dados na série temporal (decimada) e no timestamp handler
     from datetime import datetime
     fixed_ts = datetime(2026, 4, 25, 10, 0, 5).timestamp()
-    
+
     manager.get_handler("timestamp").time_series.add(fixed_ts)
     mock_handler.time_series.add(30.0)
 
@@ -350,7 +350,7 @@ def test_api_download_charts_zip_success(client, mock_handler, mocker):
         ts_val = 1714088826.0 + i
         ts_handler.data.add(ts_val)
         ts_handler.time_series.add(ts_val)
-        
+
         mock_handler.data.add(20.0 + i)
         mock_handler.time_series.add(20.0 + i)
 

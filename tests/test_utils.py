@@ -12,10 +12,10 @@ def test_acquisition_gate_synced_behavior():
     """Com enable() ativo, wait() deve retornar o valor enviado por signal()."""
     gate = AcquisitionGate()
     gate.enable()
-    
+
     gate.signal(True)
     assert gate.wait() is True
-    
+
     gate.signal(False)
     assert gate.wait() is False
 
@@ -24,7 +24,7 @@ def test_acquisition_gate_handles_empty_queue():
     """Com enable() ativo mas sem sinal, wait() deve retornar False após timeout (evita travar)."""
     gate = AcquisitionGate()
     gate.enable()
-    
+
     # Não sinalizamos nada. O timeout curto garante que o teste não fique preso.
     assert gate.wait(timeout=0.1) is False
 

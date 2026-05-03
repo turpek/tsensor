@@ -1,7 +1,10 @@
+from tsensor.core.data_stream import DataStream
 import time
 import pytest
 from tsensor.core.handlers import NTCHandler, LM35Handler, MPS20Handler, StreamManager, SheetsHandler, TimestampHandler
 ...
+
+
 @pytest.fixture
 def timestamp_handler():
     # Mockando as streams para o handler
@@ -14,7 +17,7 @@ def timestamp_handler():
 def test_handle_valid_unix_timestamp(timestamp_handler):
     """Testa o processamento de um Unix Timestamp válido via API pública (prefixo U=)."""
     from tsensor.core.handlers import sync_time
-    sync_time.offset = 0.0 # Reseta para o teste não falhar por offset residual
+    sync_time.offset = 0.0  # Reseta para o teste não falhar por offset residual
     ts_str = "U=1714088826.873"
     success = timestamp_handler.handle(ts_str)
 
@@ -33,7 +36,7 @@ def test_handle_invalid_timestamp_falls_back_to_now(timestamp_handler, mocker):
     assert success is True
     # O valor armazenado deve ser o valor retornado pelo time()
     assert timestamp_handler.data.samples[0] == mock_now
-from tsensor.core.data_stream import DataStream
+
 
 # --- FIXTURES ---
 
@@ -163,10 +166,10 @@ def test_sheets_handler_consumes_iterator(lm35_handler):
     # Mas como o usuário disse que TemperatureHandler continua Regex, vamos criar um SheetsHandler real.
     d, b, t = DataStream(10), DataStream(10), DataStream(10)
     handler = SheetsHandler(d, b, t, "Teste", 1023, 1.1)
-    
+
     it = iter(["25.5", "ignored"])
     success = handler.handle(it)
-    
+
     assert success is True
     assert d.samples[0] == 25.5
     # Verifica se o iterador avançou
@@ -240,7 +243,8 @@ def test_stream_manager_validate_with_multiple_handlers(stream_manager, ntc_hand
 
     assert stream_manager.validate("T=2048") is True
     assert stream_manager.validate("P=93556") is True
-    assert stream_manager.validate("U=1714088826") is False  # Nenhum dos dois lida com U=
+    # Nenhum dos dois lida com U=
+    assert stream_manager.validate("U=1714088826") is False
 
 
 def test_stream_manager_validate_no_match(stream_manager, ntc_handler):
@@ -311,4 +315,5 @@ def test_mps20_custom_calibration():
 
     # Com a nova fórmula simplificada (adc / 1000), o valor esperado é simplesmente o ADC / 1000
     expected_pressure = adc_target / 1000.0
-    assert custom_handler._convert(adc_target) == pytest.approx(expected_pressure, abs=1e-2)
+    assert custom_handler._convert(adc_target) == pytest.approx(
+        expected_pressure, abs=1e-2)

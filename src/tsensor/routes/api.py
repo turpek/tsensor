@@ -88,13 +88,14 @@ def export_data():
 
         for name in sensor_names:
             ds = manager._handlers[name].data
-            
+
             # Se for o handler de timestamp, formata os valores Unix para string legível
             if name == "timestamp":
-                samples = [datetime.fromtimestamp(v).strftime("%H:%M:%S.%f")[:-3] for v in ds.samples]
+                samples = [datetime.fromtimestamp(v).strftime(
+                    "%H:%M:%S.%f")[:-3] for v in ds.samples]
             else:
                 samples = list(ds.samples)
-                
+
             sensor_data[name] = samples
             if len(samples) > max_len:
                 max_len = len(samples)
@@ -272,7 +273,7 @@ def get_histogram():
     labels_globais = []
     if ts_handler:
         labels_globais = [
-            datetime.fromtimestamp(v).strftime("%H:%M:%S") 
+            datetime.fromtimestamp(v).strftime("%H:%M:%S")
             for v in ts_handler.time_series.samples
         ]
 
@@ -293,9 +294,10 @@ def get_histogram():
         temps = ds.samples
         if temps.size > 1:
             res_samples = detrend(temps)
-            res_stat = Stat(total_samples=len(res_samples), initial_data=res_samples)
+            res_stat = Stat(total_samples=len(res_samples),
+                            initial_data=res_samples)
             res_hist = hybrid_histogram(
-                np.array(res_samples), res_stat.amplitude, res_stat.mean, 
+                np.array(res_samples), res_stat.amplitude, res_stat.mean,
                 resolucao_adc=0.01, decimal_label=6
             )
             residual_data = {
@@ -349,7 +351,7 @@ def download_charts_zip():
     labels_globais = []
     if ts_handler:
         labels_globais = [
-            datetime.fromtimestamp(v).strftime("%H:%M:%S") 
+            datetime.fromtimestamp(v).strftime("%H:%M:%S")
             for v in ts_handler.time_series.samples
         ]
 

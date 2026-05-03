@@ -25,11 +25,12 @@ def test_setup_serial_manager_adds_timestamp_as_first_handler(mocker):
 
     # Verificações
     assert len(serial_manager) == 2
-    
+
     # O primeiro handler deve ser o timestamp
     handler_names = list(serial_manager._handlers.keys())
     assert handler_names[0] == "timestamp"
-    assert isinstance(serial_manager.get_handler("timestamp"), TimestampHandler)
+    assert isinstance(serial_manager.get_handler(
+        "timestamp"), TimestampHandler)
     assert handler_names[1] == "Temp"
 
 
@@ -76,7 +77,7 @@ def test_setup_manager_adds_multiple_handlers_correctly(mocker):
     assert result_manager.get_handler("Ambiente") is not None
     assert result_manager.get_handler("Motor") is not None
 
-    # Verifica se as classes de handler foram instanciadas 2 vezes (sensores) 
+    # Verifica se as classes de handler foram instanciadas 2 vezes (sensores)
     # mais a do timestamp (que também usa o mock do SheetsHandler no teste)
     assert mock_handler_cls.call_count == 3
 

@@ -29,13 +29,14 @@ def synchronize_time(ser: Serial) -> None:
                 logger.debug(f"Sincronizando... {len(offsets)}/{max_samples}")
 
     if offsets:
-        # Usamos o mínimo observado para o offset. 
+        # Usamos o mínimo observado para o offset.
         # O menor offset representa o pacote que viajou com menor latência USB/Buffer.
         sync_time.offset = min(offsets)
-        logger.info(f"Tempo sincronizado! Offset: {sync_time.offset:.4f}s (baseado em {len(offsets)} amostras)")
+        logger.info(
+            f"Tempo sincronizado! Offset: {sync_time.offset:.4f}s (baseado em {len(offsets)} amostras)")
     else:
-        logger.error("Falha ao sincronizar tempo: nenhum timestamp válido recebido.")
-
+        logger.error(
+            "Falha ao sincronizar tempo: nenhum timestamp válido recebido.")
 
 
 def serial_reading(
@@ -81,7 +82,8 @@ def serial_reading(
             first_handler = next(iter(local_manager._handlers.values()))
 
             if len(first_handler.data) >= batch_size:
-                logger.info(f"Exportando lote de {batch_size} amostras (Modo COLUMNS)...")
+                logger.info(
+                    f"Exportando lote de {batch_size} amostras (Modo COLUMNS)...")
 
                 handlers = list(local_manager._handlers.values())
 
@@ -98,7 +100,8 @@ def serial_reading(
                 # Avança o cursor e exporta usando COLUMNS
                 with sheets_lock:
                     export_cursor.major_row(batch_size, len(handlers))
-                    sheet.export(export_data, export_cursor, major_mode='COLUMNS')
+                    sheet.export(export_data, export_cursor,
+                                 major_mode='COLUMNS')
                     acq_gate.signal(True)
                     time.sleep(1)
 
@@ -155,7 +158,8 @@ def sheets_reading(
                     result = sheet.fetch_data(read_cursor)
 
                 value_ranges = result.get('valueRanges', [])
-                lines = value_ranges[0].get('values', []) if value_ranges else []
+                lines = value_ranges[0].get(
+                    'values', []) if value_ranges else []
 
                 if lines:
                     app_status["fetch_time"] = time.time()
@@ -177,7 +181,8 @@ def sheets_reading(
                     "Cota da API excedida (429). Aguardando 15 segundos para cooldown...")
                 time.sleep(15)
             else:
-                logger.error("Erro crítico durante a leitura do Google Sheets: {e}")
+                logger.error(
+                    "Erro crítico durante a leitura do Google Sheets: {e}")
 
             read_cursor.revert_rows(batch_size)
 

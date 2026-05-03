@@ -17,20 +17,24 @@ def test_serial_reading_basic_loop(mocker):
 
     # 2. Mock do StreamManager (Global - usado para controle)
     mock_manager = mocker.Mock(spec=StreamManager)
-    type(mock_manager).is_active = mocker.PropertyMock(side_effect=[True, True, False])
+    type(mock_manager).is_active = mocker.PropertyMock(
+        side_effect=[True, True, False])
 
     # 3. Mock do Local Manager (retornado pelo setup_serial_manager)
     mock_local_manager = mocker.Mock(spec=StreamManager)
-    mocker.patch("tsensor.core.serial_reader.setup_serial_manager", return_value=mock_local_manager)
-    
+    mocker.patch("tsensor.core.serial_reader.setup_serial_manager",
+                 return_value=mock_local_manager)
+
     # Mock do SheetsManager para evitar exportação real
     mock_sheet_cls = mocker.patch("tsensor.core.serial_reader.SheetsManager")
-    
+
     # Mock do config
-    mocker.patch("tsensor.core.serial_reader.config", {"acquisition": {"serial_batch_size": 50}})
+    mocker.patch("tsensor.core.serial_reader.config", {
+                 "acquisition": {"serial_batch_size": 50}})
 
     # 4. Execução
-    serial_reading(port="/dev/ttyUSB0", baudrate=115200, stream_manager=mock_manager)
+    serial_reading(port="/dev/ttyUSB0", baudrate=115200,
+                   stream_manager=mock_manager)
 
     # 5. Asserts
     # Deve despachar para o local_manager
@@ -41,11 +45,12 @@ def test_serial_reading_basic_loop(mocker):
 def test_serial_reading_handles_errors(mocker):
     """Verifica se a função lida com falhas na abertura da porta."""
     from tsensor.core.serial_connection import SerialException
-    mocker.patch("tsensor.core.serial_reader.Serial", side_effect=SerialException("Port busy"))
-    
+    mocker.patch("tsensor.core.serial_reader.Serial",
+                 side_effect=SerialException("Port busy"))
+
     mock_manager = mocker.Mock(spec=StreamManager)
     serial_reading("COM1", 9600, mock_manager)
-    
+
     assert app_status["connected"] is False
     assert "Port busy" in app_status["error"]
 
@@ -56,11 +61,11 @@ def test_sheets_reading_success_loop(mocker):
     # Mock do acq_gate para retornar True imediatamente e não travar o teste
     mock_gate = mocker.patch("tsensor.core.serial_reader.acq_gate")
     mock_gate.wait.return_value = True
-    
+
     # Mock do SheetsManager
     mock_sheet_cls = mocker.patch("tsensor.core.serial_reader.SheetsManager")
     mock_sheet_inst = mock_sheet_cls.return_value
-    
+
     # Simula retorno de 2 linhas
     mock_sheet_inst.fetch_data.return_value = {
         'valueRanges': [{'values': [["10:00:00", "25.0"], ["10:00:01", "25.1"]]}]
@@ -68,7 +73,8 @@ def test_sheets_reading_success_loop(mocker):
 
     mock_manager = mocker.Mock(spec=StreamManager)
     # Roda 1 vez e para
-    type(mock_manager).is_active = mocker.PropertyMock(side_effect=[True, False])
+    type(mock_manager).is_active = mocker.PropertyMock(
+        side_effect=[True, False])
     mock_manager.__len__ = mocker.Mock(return_value=1)
 
     sheets_reading(mock_manager)
@@ -87,16 +93,16 @@ def test_sheets_reading_quota_error_handling(mocker):
     # Mock do acq_gate
     mock_gate = mocker.patch("tsensor.core.serial_reader.acq_gate")
     mock_gate.wait.return_value = True
-    
+
     mock_sheet_cls = mocker.patch("tsensor.core.serial_reader.SheetsManager")
     mock_sheet_inst = mock_sheet_cls.return_value
-    
+
     # Simula erro 429 na primeira chamada e sucesso na segunda
     from googleapiclient.errors import HttpError
     mock_response = mocker.Mock()
     mock_response.status = 429
     mock_response.reason = "Quota Exceeded"
-    
+
     mock_sheet_inst.fetch_data.side_effect = [
         Exception("429 Quota Exceeded"),
         {'valueRanges': []}
@@ -104,7 +110,8 @@ def test_sheets_reading_quota_error_handling(mocker):
 
     mock_manager = mocker.Mock(spec=StreamManager)
     # Roda 2 vezes para testar o retry e para
-    type(mock_manager).is_active = mocker.PropertyMock(side_effect=[True, True, False])
+    type(mock_manager).is_active = mocker.PropertyMock(
+        side_effect=[True, True, False])
     mock_manager.__len__ = mocker.Mock(return_value=1)
 
     sheets_reading(mock_manager)
@@ -119,18 +126,21 @@ def test_sheets_reading_reverts_cursor_when_empty(mocker):
     # Mock do acq_gate
     mock_gate = mocker.patch("tsensor.core.serial_reader.acq_gate")
     mock_gate.wait.return_value = True
-    
+
     mock_sheet_cls = mocker.patch("tsensor.core.serial_reader.SheetsManager")
     mock_sheet_inst = mock_sheet_cls.return_value
-    mock_sheet_inst.fetch_data.return_value = {'valueRanges': []} # Planilha "vazia" no momento
+    mock_sheet_inst.fetch_data.return_value = {
+        'valueRanges': []}  # Planilha "vazia" no momento
 
     mock_manager = mocker.Mock(spec=StreamManager)
-    type(mock_manager).is_active = mocker.PropertyMock(side_effect=[True, False])
+    type(mock_manager).is_active = mocker.PropertyMock(
+        side_effect=[True, False])
     mock_manager.__len__ = mocker.Mock(return_value=1)
 
     # Espiona o SpreadSheetRange para ver o revert_rows
     # Como SpreadSheetRange é instanciado localmente, vamos mockar a classe
-    mock_range_cls = mocker.patch("tsensor.core.serial_reader.SpreadSheetRange")
+    mock_range_cls = mocker.patch(
+        "tsensor.core.serial_reader.SpreadSheetRange")
     mock_range_inst = mock_range_cls.return_value
 
     sheets_reading(mock_manager)
@@ -158,7 +168,8 @@ def test_sheets_reading_uses_correct_column_count(mocker):
     mock_manager.__len__ = mocker.Mock(return_value=4)
 
     # Mock do SpreadSheetRange para capturar a chamada major_row
-    mock_range_cls = mocker.patch("tsensor.core.serial_reader.SpreadSheetRange")
+    mock_range_cls = mocker.patch(
+        "tsensor.core.serial_reader.SpreadSheetRange")
     mock_range_inst = mock_range_cls.return_value
 
     sheets_reading(mock_manager)
