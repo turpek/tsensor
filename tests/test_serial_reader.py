@@ -87,6 +87,71 @@ def test_sheets_reading_success_loop(mocker):
     assert isinstance(args[0], type(iter([])))
 
 
+def test_serial_reading_skips_invalid_data(mocker):
+    """Garante que linhas vazias, corrompidas ou incompletas são ignoradas."""
+    # 1. Mock do Serial
+    mock_serial_cls = mocker.patch("tsensor.core.serial_reader.Serial")
+    mock_ser_instance = mock_serial_cls.return_value
+
+    # Sequência de leitura:
+    # 1. Sync (pular)
+    # 2. Vazio
+    # 3. Corrompido (só prefixo)
+    # 4. Incompleto (falta um sensor)
+    # 5. Válido (para fechar um ciclo)
+    # 6. Stop
+    sync_samples = [b"U=1714240000\n"] * 12
+    invalid_samples = [
+        b"\n",               # 1. Vazio
+        b"T=\n",             # 2. Corrompido
+        b"T=25.5\n",         # 3. Incompleto (falta P= se houver 2 sensores)
+        b"T=25.5,P=1013\n"   # 4. Válido
+    ]
+    mock_ser_instance.readline.side_effect = sync_samples + invalid_samples + [b""]
+
+    # 2. Mock do StreamManager principal
+    mock_manager = mocker.Mock(spec=StreamManager)
+    # Loop roda enquanto True, para no False
+    # Precisamos de chamadas suficientes para consumir os samples
+    type(mock_manager).is_active = mocker.PropertyMock(
+        side_effect=[True] * (len(invalid_samples) + 1) + [False]
+    )
+
+    # 3. Configuração do Local Manager com 2 handlers (Temp e Pressão)
+    from tsensor.core.handlers import LM35Handler, MPS20Handler
+    from tsensor.core.data_stream import DataStream
+
+    local_sm = StreamManager()
+    local_sm.configure()
+    local_sm.add_handler("T", LM35Handler(DataStream(10), DataStream(
+        10), DataStream(10), 4095, 3.3))
+    local_sm.add_handler("P", MPS20Handler(DataStream(10), DataStream(
+        10), DataStream(10), 4095, 3.3))
+
+    mocker.patch("tsensor.core.serial_reader.setup_serial_manager",
+                 return_value=local_sm)
+
+    # Espiona o dispatch do local_sm
+    spy_dispatch = mocker.spy(local_sm, "dispatch")
+
+    # Mock do SheetsManager
+    mocker.patch("tsensor.core.serial_reader.SheetsManager")
+    mocker.patch("tsensor.core.serial_reader.config", {
+        "acquisition": {"serial_batch_size": 10},
+        "sensors": [{"name": "T", "type": "LM35"}, {"name": "P", "type": "MPS20"}]
+    })
+
+    # 4. Execução
+    serial_reading(port="COM1", baudrate=115200, stream_manager=mock_manager)
+
+    # 5. Asserts
+    # Apenas a última linha (Válida) deve ter passado pelo validate e chegado no dispatch
+    # Note: O loop do serial_reading chama local_manager.dispatch(line)
+    assert spy_dispatch.call_count == 1
+    # Verifica se o dado despachado foi a linha completa
+    assert "T=25.5,P=1013" in spy_dispatch.call_args[0][0]
+
+
 def test_sheets_reading_quota_error_handling(mocker):
     """Verifica se a função lida com o erro 429 (Quota Exceeded) do Google."""
     mock_sleep = mocker.patch("tsensor.core.serial_reader.time.sleep")

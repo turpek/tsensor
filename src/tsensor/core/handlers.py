@@ -229,7 +229,9 @@ class MPS20Handler(PressureHandler):
         # v_ref_milli = self._v_ref * 1000
         # v_sensor_mv = (adc * v_ref_milli) / (B * adc_max)
         # press = (v_sensor_mv) / self._sensitivity
-        press = adc / 1e3
+        offset = 4075138
+        escala = 0.001313
+        press = (adc - offset) * escala / 1e3
         return round(press, 4)
 
 
@@ -326,13 +328,13 @@ class StreamManager:
         return self._handlers.get(name)
 
     def validate(self, line: str) -> bool:
-        """Verifica se algum handler reconhece o dado na linha."""
+        """Verifica se todos os handler's reconhecem os dados na linha."""
         if not isinstance(line, str):
             return False
         for handler in self._handlers.values():
-            if handler.str_to_float(line) is not None:
-                return True
-        return False
+            if handler.str_to_float(line) is None:
+                return False
+        return True
 
     def dispatch(self, line: str | Iterator) -> None:
         counts = [self._count]

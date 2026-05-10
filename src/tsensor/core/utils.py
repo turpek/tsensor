@@ -126,6 +126,7 @@ def numpy_histogram(samples: np.ndarray, decimals: int = 4) -> dict[str, int]:
     # Calcula bins automáticos e limita a no máximo 15
     edges = np.histogram_bin_edges(samples, bins="auto")
     k = min(len(edges) - 1, 15)
+    k = max(k, 8)
 
     counts, bin_edges = np.histogram(samples, bins=k)
     labels = [str(round(float(x), decimals)) for x in bin_edges[:-1]]
@@ -145,13 +146,13 @@ def hybrid_histogram(
     res_np = numpy_histogram(samples, decimals=decimal_label)
 
     # Se o NumPy gerar muitos bins, tenta o algoritmo clássico (Freedman-Diaconis customizado)
-    if len(res_np) >= 10:
-        res_classic = histogram(
-            samples, amplitude, mvg_average, resolucao_adc, decimal_label
-        )
-        # Retorna o que resultar em menos bins para evitar poluição visual no dashboard
-        if 2 < len(res_classic) < len(res_np):
-            return res_classic
+    # if len(res_np) >= 10:
+    #     res_classic = histogram(
+    #         samples, amplitude, mvg_average, resolucao_adc, decimal_label
+    #     )
+    #     # Retorna o que resultar em menos bins para evitar poluição visual no dashboard
+    #     if 2 < len(res_classic) < len(res_np):
+    #         return res_classic
 
     return res_np
 

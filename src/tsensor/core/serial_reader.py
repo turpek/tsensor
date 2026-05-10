@@ -166,6 +166,9 @@ def sheets_reading(
                 if lines:
                     app_status["fetch_time"] = time.time()
                     for line in lines:
+                        if len(line) != 3:
+                            print(f'A1 -> {read_cursor.to_a1()}')
+                            print(f'Sensores {len(line)}: {line}')
                         stream_manager.dispatch(iter(line))
 
                     # Se leu menos do que o lote, recua o cursor para a posição da última linha lida
@@ -184,7 +187,7 @@ def sheets_reading(
                 time.sleep(15)
             else:
                 logger.error(
-                    "Erro crítico durante a leitura do Google Sheets: {e}")
+                    f"Erro crítico durante a leitura do Google Sheets: {type(e)}")
 
             read_cursor.revert_rows(batch_size)
 

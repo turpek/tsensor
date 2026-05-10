@@ -67,6 +67,18 @@ class VirtualSerial:
         """Gera dados simulados com ruído gaussiano baseado no hardware configurado."""
         time.sleep(self.latency)
 
+        # 20% de chance de falha na comunicação
+        if random.random() < 0.20:
+            fail_mode = random.choice(["empty", "corrupted", "incomplete"])
+            if fail_mode == "empty":
+                return b"\n"
+            if fail_mode == "corrupted":
+                prefix = random.choice(["T=", "P=", "U="])
+                return f"{prefix}\n".encode()
+            if fail_mode == "incomplete":
+                # Retorna apenas um dado parcial (ex: só Temperatura sem P ou U)
+                return b"T=2250\n"
+
         results = []
 
         # Temperatura (T)
