@@ -19,6 +19,8 @@ dependencies = [
     "numpy",
     "matplotlib",
     "scipy",
+    "pygame",
+    "ovld",
 ]
 
 [tool.setuptools.packages.find]

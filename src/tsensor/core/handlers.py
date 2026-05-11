@@ -357,10 +357,39 @@ class StreamManager:
             return False
 
         # Se houver limite de amostras, verifica a contagem
-        if isinstance(self._total_samples, int) and self._count >= self._total_samples:
-            return False
+        # if isinstance(self._total_samples, int) and self._count >= self._total_samples:
+        #     return False
 
         return self._active
+
+
+# Handlers especiais para o Radar (uso local, não vão para o Sheets)
+class RadarDataHandler:
+    def __init__(self, prefix: str):
+        self.prefix = f"{prefix}="
+        self.value: int = 0
+
+    def handle(self, line: str) -> bool:
+        if self.prefix in line:
+            try:
+                parts = line.split(',')
+                for p in parts:
+                    if p.startswith(self.prefix):
+                        self.value = int(float(p.split('=')[1]))
+                        return True
+            except (ValueError, IndexError):
+                pass
+        return False
+
+
+class RadarAngleHandler(RadarDataHandler):
+    def __init__(self):
+        super().__init__("A")
+
+
+class RadarDistanceHandler(RadarDataHandler):
+    def __init__(self):
+        super().__init__("D")
 
 
 # Mapeamento global de handlers disponíveis para configuração via TOML

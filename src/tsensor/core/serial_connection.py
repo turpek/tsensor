@@ -59,6 +59,10 @@ class VirtualSerial:
         self.latency = latency_us / 1_000_000.0
         self._start_ts = 608200.0
         self._creation_time = time.time()
+        
+        # Estado do Radar
+        self._angle = 0
+        self._angle_step = 1
 
         logger.info(
             f"VIRTUAL SERIAL: Simulando {mcu.upper()} @ {vref}V (Latency: {self.latency:.6f}s)")
@@ -77,11 +81,11 @@ class VirtualSerial:
             if fail_mode == "empty":
                 return b"\n"
             if fail_mode == "corrupted":
-                prefix = random.choice(["T=", "P=", "U="])
+                prefix = random.choice(["T=", "P=", "U=", "A=", "D="])
                 return f"{prefix}\n".encode()
             if fail_mode == "incomplete":
-                # Retorna apenas um dado parcial (ex: só Temperatura sem P ou U)
-                return b"T=2250\n"
+                # Retorna apenas um dado parcial
+                return b"A=90\n"
 
         results = []
 
@@ -96,6 +100,16 @@ class VirtualSerial:
             target = self.targets["P"]
             val_p = int(random.gauss(target, self.targets["sigma_p"]))
             results.append(f"P={max(0, val_p)}")
+
+        # Radar (A e D)
+        # Simula varredura 0 -> 180 -> 0
+        results.append(f"A={self._angle}")
+        dist = 20 if (80 < self._angle < 100) else 50 # Simula objeto no centro
+        results.append(f"D={dist}")
+        
+        self._angle += self._angle_step
+        if self._angle >= 180 or self._angle <= 0:
+            self._angle_step *= -1
 
         # Timestamp (U)
         current_ts = self._start_ts + (time.time() - self._creation_time)

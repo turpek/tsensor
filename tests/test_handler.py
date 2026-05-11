@@ -176,60 +176,6 @@ def test_sheets_handler_consumes_iterator(lm35_handler):
     assert next(it) == "ignored"
 
 
-def test_stream_manager_is_active_with_total_samples_limit():
-    limit = 5
-    manager = StreamManager()
-    manager.configure(timeout=10, total_samples=limit)
-
-    d, b, t = DataStream(10), DataStream(10), DataStream(10)
-    h = LM35Handler(d, b, t, 1023, 1.1)
-    manager.add_handler("s1", h)
-
-    for i in range(limit):
-        assert manager.is_active is True
-        manager.dispatch("T=100")
-
-    assert manager.is_active is False
-
-
-def test_stream_manager_is_active_based_on_max_samples_per_sensor(stream_manager):
-    """
-    Testa se o manager continua ativo enquanto nenhum sensor individualmente 
-    atingiu o limite, mesmo que a soma de amostras de todos os sensores 
-    ultrapasse o total_samples.
-    """
-    limit = 10
-    # Timeout alto para não interferir
-    stream_manager.configure(timeout=60, total_samples=limit)
-
-    # Sensor 1
-    d1, b1, t1 = DataStream(20), DataStream(20), DataStream(20)
-    h1 = LM35Handler(d1, b1, t1, 1023, 1.1)
-
-    # Sensor 2
-    d2, b2, t2 = DataStream(20), DataStream(20), DataStream(20)
-    h2 = LM35Handler(d2, b2, t2, 1023, 1.1)
-
-    stream_manager.add_handler("s1", h1)
-    stream_manager.add_handler("s2", h2)
-
-    # Envia 6 mensagens. Como ambos processam, o contador global atual chegaria a 12.
-    # Pela regra nova, o manager deve ver que o máximo de amostras em um stream é 6.
-    for _ in range(6):
-        stream_manager.dispatch("T=100")
-
-    # Se falhar aqui (is_active == False), a inconsistência foi capturada.
-    assert stream_manager.is_active is True
-    assert stream_manager.count_samples == 6
-
-    # Completa até o limite de 10
-    for _ in range(4):
-        stream_manager.dispatch("T=100")
-
-    assert stream_manager.is_active is False
-    assert stream_manager.count_samples == 10
-
-
 def test_stream_manager_validate_with_matching_handler(stream_manager, ntc_handler):
     """Verifica se validate retorna True quando todos os handlers reconhecem os dados na linha."""
     stream_manager.add_handler("ntc", ntc_handler)

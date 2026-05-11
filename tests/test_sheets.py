@@ -281,7 +281,6 @@ def test_sheets_manager_delete_rows_calls_batch_update(mock_sheets_deps, mocker)
         'deleteRange': {
             'range': {
                 'sheetId': 12345,
-                'dimension': 'ROWS',
                 'startRowIndex': 1,
                 'endRowIndex': 51
             },

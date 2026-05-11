@@ -1,7 +1,7 @@
 from datetime import datetime
 from math import ceil
-from time import time
-from typing import Optional, Any, Iterator
+from time import time, sleep
+from typing import Optional, Any, Iterator, Callable
 from queue import Queue, Empty
 import numpy as np
 import os
@@ -98,6 +98,21 @@ def save_config(config_dict: dict) -> None:
     """Salva as configurações de volta no arquivo TOML."""
     with open(CONFIG_PATH, "w") as f:
         toml.dump(config_dict, f)
+
+
+class Timer:
+    """Temporizador não-bloqueante para controle de intervalos."""
+
+    def __init__(self):
+        self._last_time = time()
+
+    def reset(self) -> None:
+        """Grava o tempo atual (marca o ponto de partida)."""
+        self._last_time = time()
+
+    def elapsed(self, seconds: float) -> bool:
+        """Retorna True se o tempo passado for maior ou igual ao intervalo informado."""
+        return (time() - self._last_time) >= seconds
 
 
 def detrend(samples: list[float] | np.ndarray) -> list[float]:

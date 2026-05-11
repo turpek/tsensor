@@ -1,9 +1,13 @@
 from loguru import logger
 from tsensor.core.serial_connection import Serial, SerialException
-from tsensor.core.handlers import StreamManager, sync_time, TimestampHandler
-from tsensor.core.sheets import SheetsManager, SpreadSheetRange
+from tsensor.core.handlers import StreamManager, sync_time, TimestampHandler, RadarAngleHandler, RadarDistanceHandler
+from tsensor.core.sheets import SheetsManager
+from tsensor.core.gui_radar import RadarGUI
+from tsensor.core.utils import Timer
 from tsensor.extensions import app_status, sync_coordinator, config, setup_serial_manager, sheets_lock
+from queue import Queue, Empty
 import time
+import threading
 
 
 def synchronize_time(ser: Serial) -> None:
@@ -39,6 +43,38 @@ def synchronize_time(ser: Serial) -> None:
             "Falha ao sincronizar tempo: nenhum timestamp válido recebido.")
 
 
+def radar_thread_loop(ser: Serial, stream_manager: StreamManager, data_queue: Queue) -> None:
+    """Thread dedicada para leitura serial e atualização do Radar GUI."""
+    angle_h = RadarAngleHandler()
+    dist_h = RadarDistanceHandler()
+    radar_gui = RadarGUI(width=1280, height=720)
+
+    try:
+        while stream_manager.is_active:
+            line = ser.readline().decode("utf-8", errors="ignore").strip()
+
+            angle_h.handle(line)
+            dist_h.handle(line)
+            radar_gui.update(angle_h.value, dist_h.value)
+
+            data_queue.put(line)
+    except Exception as e:
+        logger.error(f"Erro na thread do Radar: {e}")
+    finally:
+        radar_gui.close()
+
+
+def start_radar_thread(ser: Serial, stream_manager: StreamManager, data_queue: Queue) -> threading.Thread:
+    """Instancia e inicia a thread do radar."""
+    thread = threading.Thread(
+        target=radar_thread_loop,
+        args=(ser, stream_manager, data_queue),
+        daemon=True
+    )
+    thread.start()
+    return thread
+
+
 def serial_reading(
     port: str, baudrate: int, stream_manager: StreamManager, timeout: float = 1.0
 ) -> None:
@@ -68,14 +104,28 @@ def serial_reading(
     sheet.setup(row_count=total_samples + 1, col_count=col_count)
     export_cursor = sync_coordinator.write_cursor
 
+    # Fila para comunicação entre threads
+    data_queue = Queue()
+
     synchronize_time(ser)
     logger.info(
         f"Iniciando coleta Serial (Modo Batch Export: {batch_size})...")
 
+    # Dispara a thread do Radar
+    start_radar_thread(ser, stream_manager, data_queue)
+
+    # Controle de exportação não-bloqueante
+    export_timer = Timer()
+
     try:
         ser.reset_input_buffer()
         while stream_manager.is_active:
-            line = ser.readline().decode("utf-8", errors="ignore").strip()
+            try:
+                # Consome da fila com timeout para não travar o loop de interrupção
+                line = data_queue.get(timeout=0.1)
+            except Empty:
+                continue
+
             if not local_manager.validate(line):
                 continue
 
@@ -85,44 +135,43 @@ def serial_reading(
             # Assume que todos os handlers têm o mesmo tamanho
             first_handler = next(iter(local_manager._handlers.values()))
 
-            if len(first_handler.data) >= batch_size:
+            if len(first_handler.data) >= batch_size and export_timer.elapsed(1.0):
                 handlers = list(local_manager._handlers.values())
+                actual_batch = len(first_handler.data)
 
                 # Janela Deslizante e Sincronia centralizadas no Coordinator
-                sync_coordinator.on_write_batch(sheet, batch_size, sheets_lock)
+                sync_coordinator.on_write_batch(
+                    sheet, actual_batch, sheets_lock)
 
                 logger.info(
-                    f"Exportando lote de {batch_size} amostras (Modo COLUMNS)...")
+                    f"Exportando lote de {actual_batch} amostras (Modo COLUMNS)...")
 
                 # Prepara os dados: cada lista interna é uma COLUNA completa
-                # handlers[0] é o TimestampHandler, os demais são sensores
                 export_data = [list(h.data.samples) for h in handlers]
 
-                # Calcula a latência do lote (atraso de retenção/transporte)
+                # Calcula a latência do lote
                 if export_data and export_data[0]:
                     last_mcu_ts = export_data[0][-1]
-                    tf = time.time()
-                    app_status["batch_latency"] = tf - last_mcu_ts
+                    app_status["batch_latency"] = time.time() - last_mcu_ts
 
                 # Avança o cursor e exporta usando COLUMNS
                 with sheets_lock:
-                    export_cursor.major_row(batch_size, len(handlers))
+                    export_cursor.major_row(actual_batch, len(handlers))
                     sheet.export(export_data, export_cursor,
                                  major_mode='COLUMNS')
-                    time.sleep(1)
 
                 # Limpa os buffers locais
                 for h in handlers:
                     h.data.clear()
 
-                # Limpa o buffer da serial para garantir que o próximo lote comece com dados recentes
-                # ser.reset_input_buffer()
+                # Marca o tempo da última exportação para o cooldown
+                export_timer.reset()
 
                 # Reset manual do contador interno do manager local
                 local_manager._count = 0
 
     except Exception as e:
-        logger.error(f"Erro crítico na aquisição Serial: {e}")
+        logger.exception(f"Erro crítico na aquisição Serial: {e}")
     finally:
         ser.close()
         logger.info("Coleta Serial finalizada.")

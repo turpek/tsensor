@@ -7,16 +7,29 @@ from tsensor.extensions import app_status, sync_coordinator
 
 def test_serial_reading_basic_loop(mocker):
     """Verifica se o loop de leitura serial consome dados e despacha para o local_manager."""
+    # Mock do Timer
+    mock_timer = mocker.patch("tsensor.core.serial_reader.Timer")
+    mock_timer.return_value.elapsed.return_value = True
+
+    # Mock do RadarGUI e da Thread para evitar delay
+    mocker.patch("tsensor.core.serial_reader.RadarGUI")
+    mocker.patch("tsensor.core.serial_reader.start_radar_thread")
+
+    # Mock da Queue para injetar dados instantaneamente
+    mock_queue = mocker.patch("tsensor.core.serial_reader.Queue")
+    # Simula o retorno de uma linha e depois levanta Empty
+    from queue import Empty
+    mock_queue.return_value.get.side_effect = ["T=2500", Empty()]
+
     # 1. Mock do Serial
     mock_serial_cls = mocker.patch("tsensor.core.serial_reader.Serial")
     mock_ser_instance = mock_serial_cls.return_value
-    # Fornece timestamps para sincronização (precisa de max_samples=10 agora) e depois dados
-    sync_samples = [b"U=1714240000\n"] * 12
-    data_samples = [b"T=2500\n", b""]
-    mock_ser_instance.readline.side_effect = sync_samples + data_samples
+    # Sincronização
+    mock_ser_instance.readline.side_effect = [b"U=1714240000\n"] * 12
 
-    # 2. Mock do StreamManager (Global - usado para controle)
+    # 2. Mock do StreamManager (Global)
     mock_manager = mocker.Mock(spec=StreamManager)
+    # Roda apenas 2 vezes (um para o dado, outro para o Empty/Stop)
     type(mock_manager).is_active = mocker.PropertyMock(
         side_effect=[True, True, False])
 
@@ -92,33 +105,30 @@ def test_sheets_reading_success_loop(mocker):
 
 def test_serial_reading_skips_invalid_data(mocker):
     """Garante que linhas vazias, corrompidas ou incompletas são ignoradas."""
-    # 1. Mock do Serial
+    # Mock do Timer
+    mock_timer = mocker.patch("tsensor.core.serial_reader.Timer")
+    mock_timer.return_value.elapsed.return_value = True
+
+    # Mock do RadarGUI e Thread
+    mocker.patch("tsensor.core.serial_reader.RadarGUI")
+    mocker.patch("tsensor.core.serial_reader.start_radar_thread")
+
+    # Mock da Queue com os dados inválidos e um válido
+    mock_queue = mocker.patch("tsensor.core.serial_reader.Queue")
+    from queue import Empty
+    mock_queue.return_value.get.side_effect = [
+        "", "T=", "T=25.5", "T=25.5,P=1013", Empty()
+    ]
+
+    # 1. Mock do Serial (Sync apenas)
     mock_serial_cls = mocker.patch("tsensor.core.serial_reader.Serial")
     mock_ser_instance = mock_serial_cls.return_value
-
-    # Sequência de leitura:
-    # 1. Sync (pular)
-    # 2. Vazio
-    # 3. Corrompido (só prefixo)
-    # 4. Incompleto (falta um sensor)
-    # 5. Válido (para fechar um ciclo)
-    # 6. Stop
-    sync_samples = [b"U=1714240000\n"] * 12
-    invalid_samples = [
-        b"\n",               # 1. Vazio
-        b"T=\n",             # 2. Corrompido
-        b"T=25.5\n",         # 3. Incompleto (falta P= se houver 2 sensores)
-        b"T=25.5,P=1013\n"   # 4. Válido
-    ]
-    mock_ser_instance.readline.side_effect = sync_samples + \
-        invalid_samples + [b""]
+    mock_ser_instance.readline.side_effect = [b"U=1714240000\n"] * 12
 
     # 2. Mock do StreamManager principal
     mock_manager = mocker.Mock(spec=StreamManager)
-    # Loop roda enquanto True, para no False
-    # Precisamos de chamadas suficientes para consumir os samples
     type(mock_manager).is_active = mocker.PropertyMock(
-        side_effect=[True] * (len(invalid_samples) + 1) + [False]
+        side_effect=[True] * 5 + [False]
     )
 
     # 3. Configuração do Local Manager com 2 handlers (Temp e Pressão)
@@ -158,11 +168,23 @@ def test_serial_reading_skips_invalid_data(mocker):
 
 def test_serial_reading_sliding_window_trigger(mocker):
     """Verifica se a janela deslizante é acionada e o cursor é recuado."""
-    # 1. Mock do Serial (1 sync + 1 data)
+    # Mock do Timer
+    mock_timer = mocker.patch("tsensor.core.serial_reader.Timer")
+    mock_timer.return_value.elapsed.return_value = True
+
+    # Mock do RadarGUI e Thread
+    mocker.patch("tsensor.core.serial_reader.RadarGUI")
+    mocker.patch("tsensor.core.serial_reader.start_radar_thread")
+
+    # Mock da Queue com dado que completa o batch
+    mock_queue = mocker.patch("tsensor.core.serial_reader.Queue")
+    from queue import Empty
+    mock_queue.return_value.get.side_effect = ["T=2500", Empty()]
+
+    # 1. Mock do Serial (Sync apenas)
     mock_serial_cls = mocker.patch("tsensor.core.serial_reader.Serial")
     mock_ser_instance = mock_serial_cls.return_value
-    mock_ser_instance.readline.side_effect = [
-        b"U=1714240000\n"] * 12 + [b"T=2500\n", b""]
+    mock_ser_instance.readline.side_effect = [b"U=1714240000\n"] * 12
 
     # 2. Mock do StreamManager (roda 1 vez e para)
     mock_manager = mocker.Mock(spec=StreamManager)
@@ -210,11 +232,11 @@ def test_serial_reading_sliding_window_trigger(mocker):
     serial_reading(port="COM1", baudrate=115200, stream_manager=mock_manager)
 
     # 7. Asserts
-    # Deve ter chamado delete_rows com 10 * 61 = 610
-    mock_sheet_inst.delete_rows.assert_called_once_with(start=2, count=610)
+    # Deve ter chamado delete_rows com 10 * 2 = 20
+    mock_sheet_inst.delete_rows.assert_called_once_with(start=2, count=20)
 
-    # O cursor deve ter sido recuado: 995 - 610 = 385.
-    assert mock_range._row == 385
+    # O cursor deve ter sido recuado: 995 - 20 = 975.
+    assert mock_range._row == 975
 
 
 def test_sheets_reading_quota_error_handling(mocker):

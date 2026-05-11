@@ -1,6 +1,6 @@
 .*cache
-config.toml
 token.json
+config.toml
 credentials.json
 *.csv
 *.log
