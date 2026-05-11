@@ -366,17 +366,16 @@ class StreamManager:
 # Handlers especiais para o Radar (uso local, não vão para o Sheets)
 class RadarDataHandler:
     def __init__(self, prefix: str):
-        self.prefix = f"{prefix}="
+        self.prefix = prefix
         self.value: int = 0
+        self._re = re.compile(f"{prefix}={REG_ADC_VALUE}")
 
     def handle(self, line: str) -> bool:
-        if self.prefix in line:
+        match = self._re.search(line)
+        if match:
             try:
-                parts = line.split(',')
-                for p in parts:
-                    if p.startswith(self.prefix):
-                        self.value = int(float(p.split('=')[1]))
-                        return True
+                self.value = int(float(match.group(1)))
+                return True
             except (ValueError, IndexError):
                 pass
         return False

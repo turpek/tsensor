@@ -232,11 +232,11 @@ def test_serial_reading_sliding_window_trigger(mocker):
     serial_reading(port="COM1", baudrate=115200, stream_manager=mock_manager)
 
     # 7. Asserts
-    # Deve ter chamado delete_rows com 10 * 2 = 20
-    mock_sheet_inst.delete_rows.assert_called_once_with(start=2, count=20)
+    # Deve ter chamado delete_rows com 10 * 2 * 61 = 1220
+    mock_sheet_inst.delete_rows.assert_called_once_with(start=2, count=1220)
 
-    # O cursor deve ter sido recuado: 995 - 20 = 975.
-    assert mock_range._row == 975
+    # O cursor deve ter sido recuado: 995 - 1220 = -225 -> SpreadSheetRange garante limite mínimo de 1.
+    assert mock_range._row == 1
 
 
 def test_sheets_reading_quota_error_handling(mocker):
