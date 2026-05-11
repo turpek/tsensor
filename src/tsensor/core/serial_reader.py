@@ -224,6 +224,13 @@ def sheets_reading(
                             print(f'Sensores {len(line)}: {line}')
                         stream_manager.dispatch(iter(line))
 
+                        # Inserção direta na memória da IA (elimina spam de logs HTTP)
+                        try:
+                            from tsensor.ai.dashboard import data_manager
+                            data_manager.add_row(line)
+                        except Exception:
+                            pass
+
                     # Se leu menos do que o lote, recua o cursor para a posição da última linha lida
                     if len(lines) < batch_size:
                         unread = batch_size - len(lines)

@@ -1,15 +1,62 @@
 from datetime import datetime
 from math import ceil
-from time import time, sleep
-from typing import Optional, Any, Iterator, Callable
-from queue import Queue, Empty
+from time import time
+from typing import Optional
 import numpy as np
 import os
 import toml
 import copy
 
+import json
+from urllib import request
+from loguru import logger
+
 # Caminho absoluto para o arquivo de configuração
 CONFIG_PATH = os.path.join(os.getcwd(), "config.toml")
+
+
+def notify_ai_config(config: dict) -> None:
+    """Envia a configuração atual para o módulo de IA."""
+    try:
+        port = config["presentation"].get("flask_port", 5000)
+        url = f"http://localhost:{port}/ai/api/config"
+
+        sensors = [{"name": s["name"], "type": s.get(
+            "type", "valor")} for s in config.get("sensors", [])]
+        payload = {
+            "sensors": sensors,
+            "max_rows": config["acquisition"].get("total_samples", 1000)
+        }
+
+        req = request.Request(
+            url,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with request.urlopen(req, timeout=1) as response:
+            if response.status == 200:
+                logger.info("Módulo de IA configurado com sucesso.")
+    except Exception as e:
+        logger.debug(
+            f"Falha ao notificar configuração para IA (Servidor offline?): {e}")
+
+
+def post_to_ai(row: list, port: int = 5000) -> None:
+    """Envia uma linha de dados processada para o módulo de IA."""
+    try:
+        url = f"http://localhost:{port}/ai/api/data"
+        req = request.Request(
+            url,
+            data=json.dumps(row).encode('utf-8'),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with request.urlopen(req, timeout=0.1) as response:
+            pass
+    except Exception:
+        # Silencioso para não poluir logs em alta frequência
+        pass
 
 
 def get_sensor_models() -> dict:
@@ -141,7 +188,7 @@ def numpy_histogram(samples: np.ndarray, decimals: int = 4) -> dict[str, int]:
     # Calcula bins automáticos e limita a no máximo 15
     edges = np.histogram_bin_edges(samples, bins="auto")
     k = min(len(edges) - 1, 15)
-    k = max(k, 8)
+    k = max(k, 1)
 
     counts, bin_edges = np.histogram(samples, bins=k)
     labels = [str(round(float(x), decimals)) for x in bin_edges[:-1]]

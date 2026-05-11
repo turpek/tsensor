@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IA Analysis Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <style>
+        body { background-color: #f8f9fa; }
+        .card { margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .stat-value { font-size: 1.5rem; font-weight: bold; }
+        .stat-label { font-size: 0.8rem; color: #6c757d; text-transform: uppercase; }
+        .sensor-header { border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">AI Sensor Analytics</span>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div id="sensors-container">
+            {% for sensor in sensors %}
+            <div class="row sensor-section" data-sensor-index="{{ loop.index0 }}" data-sensor-name="{{ sensor.name }}">
+                <div class="col-12">
+                    <h3 class="sensor-header">{{ sensor.name }} <small class="text-muted">({{ sensor.type }})</small></h3>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="card text-center"><div class="card-body"><div class="stat-label">Min</div><div class="stat-value text-primary" id="min-{{ loop.index0 }}">-</div></div></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center"><div class="card-body"><div class="stat-label">Max</div><div class="stat-value text-danger" id="max-{{ loop.index0 }}">-</div></div></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center"><div class="card-body"><div class="stat-label">Média</div><div class="stat-value text-success" id="mean-{{ loop.index0 }}">-</div></div></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center"><div class="card-body"><div class="stat-label">Std Dev</div><div class="stat-value text-warning" id="std-{{ loop.index0 }}">-</div></div></div>
+                </div>
+
+                <div class="col-md-8">
+                    <div class="card"><div class="card-body"><div id="chart-{{ loop.index0 }}" style="height: 350px;"></div></div></div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card"><div class="card-body"><div id="hist-{{ loop.index0 }}" style="height: 350px;"></div></div></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Carrega o script usando url_for do blueprint 'ai' -->
+    <script src="{{ url_for('ai.static', filename='ai/js/dashboard.js') }}"></script>
+</body>
+</html>

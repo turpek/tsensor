@@ -5,6 +5,7 @@ from flask import Flask
 from loguru import logger
 from tsensor.routes.home import home_route
 from tsensor.routes.api import api_route
+from .ai import ai_bp
 from tsensor.core.utils import load_config
 from tsensor.core.acquisition import start_acquisition
 
@@ -20,6 +21,7 @@ app.secret_key = "SUA_CHAVE_SECRETA"
 
 app.register_blueprint(home_route)
 app.register_blueprint(api_route)
+app.register_blueprint(ai_bp, url_prefix='/ai')
 
 
 if __name__ == "__main__":

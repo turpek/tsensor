@@ -7,7 +7,7 @@ import io
 import numpy as np
 from flask import Blueprint, render_template, jsonify, request
 from tsensor.extensions import manager, config, app_status
-from tsensor.core.utils import save_config, detrend, Stat, hybrid_histogram
+from tsensor.core.utils import save_config, detrend, Stat, hybrid_histogram, notify_ai_config
 from tsensor.core.acquisition import start_acquisition, stop_acquisition, start_serial
 from tsensor.core.exporters import CSVExporter
 
@@ -208,6 +208,9 @@ def update_config():
 
     try:
         save_config(config)
+
+        # Atualiza o módulo de IA com a nova configuração
+        notify_ai_config(config)
 
         # Atualiza status visual
         app_status["port"] = config["hardware"]["port"]

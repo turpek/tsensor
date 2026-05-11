@@ -59,7 +59,7 @@ class VirtualSerial:
         self.latency = latency_us / 1_000_000.0
         self._start_ts = 608200.0
         self._creation_time = time.time()
-        
+
         # Estado do Radar
         self._angle = 0
         self._angle_step = 1
@@ -104,9 +104,10 @@ class VirtualSerial:
         # Radar (A e D)
         # Simula varredura 0 -> 180 -> 0
         results.append(f"A={self._angle}")
-        dist = 20 if (80 < self._angle < 100) else 50 # Simula objeto no centro
+        # Simula objeto no centro
+        dist = 20 if (80 < self._angle < 100) else 50
         results.append(f"D={dist}")
-        
+
         self._angle += self._angle_step
         if self._angle >= 180 or self._angle <= 0:
             self._angle_step *= -1

@@ -10,6 +10,23 @@ import os
 # Carrega as configurações globais
 config = load_config()
 
+
+def sync_ai_config():
+    """Sincroniza a configuração de sensores diretamente com o DataManager da IA."""
+    try:
+        from tsensor.ai.dashboard import data_manager
+        sensors = [{"name": s["name"], "type": s.get("type", "valor")}
+                   for s in config.get("sensors", [])]
+        data_manager.update_config(
+            sensors, config["acquisition"].get("total_samples", 1000))
+        logger.info(f"IA sincronizada: {len(sensors)} sensores carregados.")
+    except Exception as e:
+        logger.warning(f"Não foi possível sincronizar a IA no boot: {e}")
+
+
+# Inicializa a IA com as configurações atuais
+sync_ai_config()
+
 # Parâmetros de sincronização
 _total_samples_limit = config["acquisition"].get("total_samples", 1000)
 

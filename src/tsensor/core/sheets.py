@@ -5,7 +5,7 @@ from googleapiclient.discovery import build
 from loguru import logger
 # from googleapiclient.errors import HttpError
 from tsensor.core.exporters import DataExporter
-from typing import Any, Optional, Iterator
+from typing import Any, Optional
 from pathlib import Path
 from queue import Queue, Empty
 
@@ -363,7 +363,9 @@ class SyncCoordinator:
         """Gerencia a escrita de um lote e a lógica de janela deslizante."""
         # Janela Deslizante: Se o próximo lote ultrapassar o limite, removemos o topo
         if self.write_cursor.row + batch_size > self.total_samples + 1:
-            delete_count = batch_size * 2
+
+            # Da uma folga de 2 minutos, antes de deletar novamente
+            delete_count = batch_size * 2 * 61
             with sheets_lock:
                 sheet.delete_rows(start=2, count=delete_count)
                 # Recua AMBOS os cursores para manter a sincronia física
