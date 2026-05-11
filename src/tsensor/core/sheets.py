@@ -5,8 +5,9 @@ from googleapiclient.discovery import build
 from loguru import logger
 # from googleapiclient.errors import HttpError
 from tsensor.core.exporters import DataExporter
-from typing import Any, Optional
+from typing import Any, Optional, Iterator
 from pathlib import Path
+from queue import Queue, Empty
 
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -21,6 +22,14 @@ class SpreadSheetRange:
         self._end_row = row
         self._end_col = col
         self._is_first = True
+
+    @property
+    def row(self):
+        return self._row
+
+    @property
+    def col(self):
+        return self._col
 
     def calculate_letter(self, index: int) -> str:
         """Converte índice numérico (1-based) para letras (1=A, 27=AA)."""
@@ -68,20 +77,24 @@ class SpreadSheetRange:
         """Retorna a quantidade de linhas no intervalo atual."""
         return (self._end_row - self._row) + 1
 
-    def revert_rows(self, unread_rows: int) -> None:
+    def revert_rows(self, count: int) -> None:
         """
-        Retrai o final do intervalo descartando as linhas não lidas.
-        Utilizado para compensar leituras que atingiram o final da planilha (EOF),
-        garantindo que a próxima leitura inicie logo após a última linha válida.
+        Retrai o intervalo descartando 'count' linhas.
+        Afeta tanto o início (row) quanto o fim (end_row) para manter a dimensão relativa,
+        ou apenas o fim se for uma correção de leitura (unread).
         """
-        if unread_rows <= 0:
+        if count <= 0:
             return
 
-        self._end_row -= unread_rows
+        # Para a janela deslizante, precisamos recuar o ponto de partida
+        self._row -= count
+        self._end_row -= count
 
-        # Garante que o cursor final não fique antes do início
-        if self._end_row < 0:
-            self._end_row = 0
+        # Garante que o cursor não fique antes do início da planilha
+        if self._row < 1:
+            self._row = 1
+        if self._end_row < 1:
+            self._end_row = 1
 
     def clear(self, row: int = 1, col: int = 1) -> None:
         """Reseta o cursor para uma nova posição inicial."""
@@ -125,7 +138,8 @@ class SheetsManager(DataExporter):
                 token.write(creds.to_json())
 
         self._service = build("sheets", "v4", credentials=creds)
-        self._sheet = self._service.spreadsheets()
+        self._spreadsheet = self._service.spreadsheets()
+        self._sheet = self._spreadsheet
 
         # Configura a grade inicial se solicitado
         if row_count or col_count:
@@ -285,9 +299,103 @@ class SheetsManager(DataExporter):
         """Retorna os metadados cacheados da última execução de fetch_metadata."""
         return getattr(self, '_metadata', {"rowCount": 0, "columnCount": 0, "header": []})
 
+    def delete_rows(self, start: int, count: int, sheet_name: str = 'Página1') -> dict:
+        """
+        Remove um intervalo de linhas e desloca as linhas restantes para cima.
+        Útil para implementar buffer circular/janela deslizante.
+        Índices baseados em 1 (Human-readable).
+        """
+        try:
+            # Obtém o sheet_id necessário para batchUpdate
+            spreadsheet = self._sheet.get(
+                spreadsheetId=SPREADSHEET_ID, fields='sheets.properties').execute()
+            sheet_id = None
+            for s in spreadsheet.get('sheets', []):
+                if s.get('properties', {}).get('title') == sheet_name:
+                    sheet_id = s.get('properties', {}).get('sheetId')
+                    break
+
+            if sheet_id is None:
+                raise ValueError(f"Sheet '{sheet_name}' não encontrado.")
+
+            # API usa índices 0-based, inclusive no início e exclusivo no fim.
+            # Ex: Deletar linhas 2 a 51 (Human) -> start=1, end=51 (0-based)
+            body = {
+                'requests': [{
+                    'deleteRange': {
+                        'range': {
+                            'sheetId': sheet_id,
+                            'startRowIndex': start - 1,
+                            'endRowIndex': start - 1 + count
+                        },
+                        'shiftDimension': 'ROWS'
+                    }
+                }]
+            }
+
+            logger.info(
+                f"Removendo {count} linhas da planilha '{sheet_name}' (Janela Deslizante)...")
+            return self._sheet.batchUpdate(
+                spreadsheetId=SPREADSHEET_ID, body=body).execute()
+
+        except Exception as e:
+            logger.error(f"Falha ao remover linhas da planilha: {e}")
+            raise e
+
 
 class SheetSleep:
     def __init__(self, request: int):
         self._count = 0
         self._req = request
         self._time = 1
+
+
+class SyncCoordinator:
+    def __init__(self, total_samples: int):
+        self.write_cursor = SpreadSheetRange(row=2)
+        self.read_cursor = SpreadSheetRange(row=2)
+        self.total_samples = total_samples
+        self.batch_size = 30000  # Inicia no modo histórico com batch grande
+        self.mode = 'HISTORY'  # 'HISTORY' ou 'REALTIME'
+        self._queue: Queue = Queue()
+
+    def on_write_batch(self, sheet: Any, batch_size: int, sheets_lock: Any):
+        """Gerencia a escrita de um lote e a lógica de janela deslizante."""
+        # Janela Deslizante: Se o próximo lote ultrapassar o limite, removemos o topo
+        if self.write_cursor.row + batch_size > self.total_samples + 1:
+            delete_count = batch_size * 2
+            with sheets_lock:
+                sheet.delete_rows(start=2, count=delete_count)
+                # Recua AMBOS os cursores para manter a sincronia física
+                self.write_cursor.revert_rows(delete_count)
+                self.read_cursor.revert_rows(delete_count)
+
+        # Sinaliza que novos dados foram escritos
+        self._queue.put(True)
+
+    def get_read_params(self) -> tuple[int, bool]:
+        """Retorna o (batch_size, deve_esperar) baseado no modo atual."""
+        if self.mode == 'HISTORY':
+            return self.batch_size, False
+        return self.batch_size, True
+
+    def switch_to_realtime(self):
+        """Transiciona para o modo de tempo real."""
+        if self.mode == 'HISTORY':
+            logger.info("SyncCoordinator: Transicionando para modo REALTIME.")
+            self.mode = 'REALTIME'
+            # Limpa a fila para garantir sincronia com os novos dados
+            while not self._queue.empty():
+                try:
+                    self._queue.get_nowait()
+                except Empty:
+                    break
+
+    def wait_for_data(self, timeout: float = 5.0) -> bool:
+        """Aguarda sinal de novos dados (apenas em modo REALTIME)."""
+        if self.mode == 'HISTORY':
+            return True
+        try:
+            return self._queue.get(timeout=timeout)
+        except Empty:
+            return False

@@ -63,6 +63,10 @@ class VirtualSerial:
         logger.info(
             f"VIRTUAL SERIAL: Simulando {mcu.upper()} @ {vref}V (Latency: {self.latency:.6f}s)")
 
+    def reset_input_buffer(self) -> None:
+        """Limpa o buffer de entrada (simulado)."""
+        pass
+
     def readline(self) -> bytes:
         """Gera dados simulados com ruído gaussiano baseado no hardware configurado."""
         time.sleep(self.latency)

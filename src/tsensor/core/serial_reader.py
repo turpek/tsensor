@@ -2,7 +2,7 @@ from loguru import logger
 from tsensor.core.serial_connection import Serial, SerialException
 from tsensor.core.handlers import StreamManager, sync_time, TimestampHandler
 from tsensor.core.sheets import SheetsManager, SpreadSheetRange
-from tsensor.extensions import app_status, acq_gate, config, setup_serial_manager, sheets_lock
+from tsensor.extensions import app_status, sync_coordinator, config, setup_serial_manager, sheets_lock
 import time
 
 
@@ -58,14 +58,16 @@ def serial_reading(
     local_manager = setup_serial_manager(config)
     batch_size = config["acquisition"].get("serial_batch_size", 50)
 
+    # Sincroniza o batch_size para o modo Tempo Real
+    sync_coordinator.batch_size = batch_size
+
     # Gerenciador de exportação local
     sheet = SheetsManager()
     total_samples = config["acquisition"].get("total_samples", 1000)
     col_count = 1 + len(config.get('sensors', []))
     sheet.setup(row_count=total_samples + 1, col_count=col_count)
-    export_cursor = SpreadSheetRange(row=2)
+    export_cursor = sync_coordinator.write_cursor
 
-    acq_gate.enable()
     synchronize_time(ser)
     logger.info(
         f"Iniciando coleta Serial (Modo Batch Export: {batch_size})...")
@@ -84,10 +86,13 @@ def serial_reading(
             first_handler = next(iter(local_manager._handlers.values()))
 
             if len(first_handler.data) >= batch_size:
+                handlers = list(local_manager._handlers.values())
+
+                # Janela Deslizante e Sincronia centralizadas no Coordinator
+                sync_coordinator.on_write_batch(sheet, batch_size, sheets_lock)
+
                 logger.info(
                     f"Exportando lote de {batch_size} amostras (Modo COLUMNS)...")
-
-                handlers = list(local_manager._handlers.values())
 
                 # Prepara os dados: cada lista interna é uma COLUNA completa
                 # handlers[0] é o TimestampHandler, os demais são sensores
@@ -104,7 +109,6 @@ def serial_reading(
                     export_cursor.major_row(batch_size, len(handlers))
                     sheet.export(export_data, export_cursor,
                                  major_mode='COLUMNS')
-                    acq_gate.signal(True)
                     time.sleep(1)
 
                 # Limpa os buffers locais
@@ -140,18 +144,18 @@ def sheets_reading(
         logger.error("Erro ao tentar se conectar ao Google Sheets")
         return None
 
-    # Cursor de leitura local, iniciando na linha 2 (após cabeçalho)
-    read_cursor = SpreadSheetRange(row=2)
+    # Cursor de leitura coordenado
+    read_cursor = sync_coordinator.read_cursor
     cols = len(stream_manager)
-
-    # Batch size configurável via TOML (padrão 200)
-    batch_size = config["acquisition"].get("serial_batch_size", 200)
 
     logger.info("Iniciando monitoramento da planilha...")
 
     while stream_manager.is_active:
         try:
-            if acq_gate.wait(5):
+            # Obtém parâmetros dinâmicos do Coordenador
+            batch_size, wait = sync_coordinator.get_read_params()
+
+            if sync_coordinator.wait_for_data(timeout=5):
                 # Avança o cursor para o próximo lote
                 read_cursor.major_row(batch_size, cols)
 
@@ -166,7 +170,7 @@ def sheets_reading(
                 if lines:
                     app_status["fetch_time"] = time.time()
                     for line in lines:
-                        if len(line) != 3:
+                        if len(line) != cols:
                             print(f'A1 -> {read_cursor.to_a1()}')
                             print(f'Sensores {len(line)}: {line}')
                         stream_manager.dispatch(iter(line))
@@ -178,7 +182,12 @@ def sheets_reading(
                 else:
                     # Nenhuma linha nova encontrada, recua e tenta na próxima iteração
                     read_cursor.revert_rows(batch_size)
-                time.sleep(1)
+
+                # Cooldown para não estourar cota no modo história sem espera
+                if not wait:
+                    time.sleep(0.5)
+                else:
+                    time.sleep(1)
 
         except Exception as e:
             if "429" in str(e):

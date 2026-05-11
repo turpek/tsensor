@@ -2,7 +2,7 @@ import pytest
 from tsensor.core.serial_reader import serial_reading, sheets_reading
 from tsensor.core.sheets import SpreadSheetRange, SheetsManager
 from tsensor.core.handlers import StreamManager
-from tsensor.extensions import app_status
+from tsensor.extensions import app_status, sync_coordinator
 
 
 def test_serial_reading_basic_loop(mocker):
@@ -58,9 +58,12 @@ def test_serial_reading_handles_errors(mocker):
 def test_sheets_reading_success_loop(mocker):
     """Verifica se sheets_reading consome dados da planilha e respeita o loop."""
     mocker.patch("tsensor.core.serial_reader.time.sleep")
-    # Mock do acq_gate para retornar True imediatamente e não travar o teste
-    mock_gate = mocker.patch("tsensor.core.serial_reader.acq_gate")
-    mock_gate.wait.return_value = True
+    # Mock do sync_coordinator para retornar True imediatamente e não travar o teste
+    mock_coord = mocker.patch("tsensor.core.serial_reader.sync_coordinator")
+    mock_coord.wait_for_data.return_value = True
+    mock_coord.get_read_params.return_value = (50, True)
+    mock_coord.read_cursor = SpreadSheetRange(row=2)
+    mock_coord.mode = 'REALTIME'
 
     # Mock do SheetsManager
     mock_sheet_cls = mocker.patch("tsensor.core.serial_reader.SheetsManager")
@@ -107,7 +110,8 @@ def test_serial_reading_skips_invalid_data(mocker):
         b"T=25.5\n",         # 3. Incompleto (falta P= se houver 2 sensores)
         b"T=25.5,P=1013\n"   # 4. Válido
     ]
-    mock_ser_instance.readline.side_effect = sync_samples + invalid_samples + [b""]
+    mock_ser_instance.readline.side_effect = sync_samples + \
+        invalid_samples + [b""]
 
     # 2. Mock do StreamManager principal
     mock_manager = mocker.Mock(spec=StreamManager)
@@ -152,12 +156,75 @@ def test_serial_reading_skips_invalid_data(mocker):
     assert "T=25.5,P=1013" in spy_dispatch.call_args[0][0]
 
 
+def test_serial_reading_sliding_window_trigger(mocker):
+    """Verifica se a janela deslizante é acionada e o cursor é recuado."""
+    # 1. Mock do Serial (1 sync + 1 data)
+    mock_serial_cls = mocker.patch("tsensor.core.serial_reader.Serial")
+    mock_ser_instance = mock_serial_cls.return_value
+    mock_ser_instance.readline.side_effect = [
+        b"U=1714240000\n"] * 12 + [b"T=2500\n", b""]
+
+    # 2. Mock do StreamManager (roda 1 vez e para)
+    mock_manager = mocker.Mock(spec=StreamManager)
+    type(mock_manager).is_active = mocker.PropertyMock(
+        side_effect=[True, True, False])
+
+    # 3. Configuração do Local Manager com 1 amostra já no buffer (simulando batch pronto)
+    from tsensor.core.handlers import LM35Handler
+    from tsensor.core.data_stream import DataStream
+    local_sm = StreamManager()
+    local_sm.configure()
+    handler = LM35Handler(DataStream(10), DataStream(
+        10), DataStream(10), 4095, 3.3)
+    # Preenche com 9 amostras (batch_size será 10)
+    for i in range(9):
+        handler.data.add(25.0)
+    local_sm.add_handler("T", handler)
+
+    mocker.patch("tsensor.core.serial_reader.setup_serial_manager",
+                 return_value=local_sm)
+
+    # 4. Mock do SheetsManager
+    mock_sheet_inst = mocker.Mock(spec=SheetsManager)
+    mocker.patch("tsensor.core.serial_reader.SheetsManager",
+                 return_value=mock_sheet_inst)
+
+    # Mock do SyncCoordinator global usado pelo serial_reader
+    mock_range = SpreadSheetRange(row=995)
+    mocker.patch(
+        "tsensor.core.serial_reader.sync_coordinator.write_cursor", mock_range)
+    mocker.patch("tsensor.core.serial_reader.sync_coordinator.on_write_batch",
+                 side_effect=sync_coordinator.on_write_batch)
+    mocker.patch(
+        "tsensor.core.serial_reader.sync_coordinator.total_samples", 1000)
+
+    # 5. Mock do config
+    mocker.patch("tsensor.core.serial_reader.config", {
+        "acquisition": {
+            "serial_batch_size": 10,
+            "total_samples": 1000
+        }
+    })
+
+    # 6. Execução
+    serial_reading(port="COM1", baudrate=115200, stream_manager=mock_manager)
+
+    # 7. Asserts
+    # Deve ter chamado delete_rows com 10 * 61 = 610
+    mock_sheet_inst.delete_rows.assert_called_once_with(start=2, count=610)
+
+    # O cursor deve ter sido recuado: 995 - 610 = 385.
+    assert mock_range._row == 385
+
+
 def test_sheets_reading_quota_error_handling(mocker):
     """Verifica se a função lida com o erro 429 (Quota Exceeded) do Google."""
     mock_sleep = mocker.patch("tsensor.core.serial_reader.time.sleep")
-    # Mock do acq_gate
-    mock_gate = mocker.patch("tsensor.core.serial_reader.acq_gate")
-    mock_gate.wait.return_value = True
+    # Mock do sync_coordinator
+    mock_coord = mocker.patch("tsensor.core.serial_reader.sync_coordinator")
+    mock_coord.wait_for_data.return_value = True
+    mock_coord.get_read_params.return_value = (50, True)
+    mock_coord.read_cursor = SpreadSheetRange(row=2)
 
     mock_sheet_cls = mocker.patch("tsensor.core.serial_reader.SheetsManager")
     mock_sheet_inst = mock_sheet_cls.return_value
@@ -188,9 +255,10 @@ def test_sheets_reading_quota_error_handling(mocker):
 def test_sheets_reading_reverts_cursor_when_empty(mocker):
     """Verifica se o cursor volta se não houver dados novos na planilha."""
     mocker.patch("tsensor.core.serial_reader.time.sleep")
-    # Mock do acq_gate
-    mock_gate = mocker.patch("tsensor.core.serial_reader.acq_gate")
-    mock_gate.wait.return_value = True
+    # Mock do sync_coordinator
+    mock_coord = mocker.patch("tsensor.core.serial_reader.sync_coordinator")
+    mock_coord.wait_for_data.return_value = True
+    mock_coord.get_read_params.return_value = (50, True)
 
     mock_sheet_cls = mocker.patch("tsensor.core.serial_reader.SheetsManager")
     mock_sheet_inst = mock_sheet_cls.return_value
@@ -203,23 +271,23 @@ def test_sheets_reading_reverts_cursor_when_empty(mocker):
     mock_manager.__len__ = mocker.Mock(return_value=1)
 
     # Espiona o SpreadSheetRange para ver o revert_rows
-    # Como SpreadSheetRange é instanciado localmente, vamos mockar a classe
-    mock_range_cls = mocker.patch(
-        "tsensor.core.serial_reader.SpreadSheetRange")
-    mock_range_inst = mock_range_cls.return_value
+    # Como SpreadSheetRange é instanciado localmente (pelo mock_coord), vamos mockar na classe do coordenador
+    mock_range = mocker.Mock(spec=SpreadSheetRange)
+    mock_coord.read_cursor = mock_range
 
     sheets_reading(mock_manager)
 
     # Deve ter chamado revert_rows porque lines estava vazio
-    mock_range_inst.revert_rows.assert_called()
+    mock_range.revert_rows.assert_called()
 
 
 def test_sheets_reading_uses_correct_column_count(mocker):
     """Verifica se sheets_reading utiliza len(stream_manager) para definir o range de colunas."""
     mocker.patch("tsensor.core.serial_reader.time.sleep")
-    # Mock do acq_gate
-    mock_gate = mocker.patch("tsensor.core.serial_reader.acq_gate")
-    mock_gate.wait.return_value = True
+    # Mock do sync_coordinator
+    mock_coord = mocker.patch("tsensor.core.serial_reader.sync_coordinator")
+    mock_coord.wait_for_data.return_value = True
+    mock_coord.get_read_params.return_value = (50, True)
 
     # Mock do SheetsManager
     mock_sheet_cls = mocker.patch("tsensor.core.serial_reader.SheetsManager")
@@ -232,13 +300,12 @@ def test_sheets_reading_uses_correct_column_count(mocker):
         side_effect=[True, False])
     mock_manager.__len__ = mocker.Mock(return_value=4)
 
-    # Mock do SpreadSheetRange para capturar a chamada major_row
-    mock_range_cls = mocker.patch(
-        "tsensor.core.serial_reader.SpreadSheetRange")
-    mock_range_inst = mock_range_cls.return_value
+    # Mock do cursor de leitura
+    mock_range = mocker.Mock(spec=SpreadSheetRange)
+    mock_coord.read_cursor = mock_range
 
     sheets_reading(mock_manager)
 
     # Verifica se major_row foi chamado com cols=4
     # major_row(self, rows: int, cols: int)
-    mock_range_inst.major_row.assert_called_once_with(mocker.ANY, 4)
+    mock_range.major_row.assert_called_once_with(mocker.ANY, 4)

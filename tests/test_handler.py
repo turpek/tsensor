@@ -231,7 +231,7 @@ def test_stream_manager_is_active_based_on_max_samples_per_sensor(stream_manager
 
 
 def test_stream_manager_validate_with_matching_handler(stream_manager, ntc_handler):
-    """Verifica se validate retorna True quando um dos handlers reconhece o dado."""
+    """Verifica se validate retorna True quando todos os handlers reconhecem os dados na linha."""
     stream_manager.add_handler("ntc", ntc_handler)
     assert stream_manager.validate("T=2048") is True
 
@@ -241,9 +241,12 @@ def test_stream_manager_validate_with_multiple_handlers(stream_manager, ntc_hand
     stream_manager.add_handler("ntc", ntc_handler)
     stream_manager.add_handler("pressao", mps20_handler)
 
-    assert stream_manager.validate("T=2048") is True
-    assert stream_manager.validate("P=93556") is True
-    # Nenhum dos dois lida com U=
+    # Agora exige que AMBOS estejam presentes
+    assert stream_manager.validate("T=2048,P=93556") is True
+    assert stream_manager.validate("T=2048") is False
+    assert stream_manager.validate("P=93556") is False
+
+    # Nenhum dos dois lida com U= sozinho se o manager espera T e P
     assert stream_manager.validate("U=1714088826") is False
 
 
@@ -265,22 +268,24 @@ def test_stream_manager_validate_invalid_input(stream_manager):
 
 def test_mps20_conversion_logic(mps20_handler):
     """Valida a fórmula matemática de conversão de pressão."""
-    # Sem offset, ADC 0 deve resultar em 0 kPa
-    adc_value = 0
+    # Nova fórmula: (adc - 4075138) * 0.001313 / 1e3
+    # ADC = 4075138 deve resultar em 0 kPa
+    adc_value = 4075138
     assert mps20_handler._convert(adc_value) == pytest.approx(0, abs=1e-2)
 
-    # Verifica o alvo de 93556 -> 93.556 kPa
-    assert mps20_handler._convert(93556) == pytest.approx(93.556, abs=1e-2)
+    # Verifica um ponto de teste (ex: ADC = 5000000)
+    # (5000000 - 4075138) * 0.001313 / 1000 = 1.214
+    assert mps20_handler._convert(5000000) == pytest.approx(1.214, abs=1e-2)
 
 
 def test_mps20_handle_valid_prefix(mps20_handler):
-    """Verifica se o handler processa corretamente o prefixo P= com 24 bits."""
-    line = "P=93556"
+    """Verifica se o handler processa corretamente o prefixo P=."""
+    # (5000000 - 4075138) * 0.001313 / 1000 = 1.214
+    line = "P=5000000"
     success = mps20_handler.handle(line)
     assert success is True
     assert len(mps20_handler.data) == 1
-    # Pressão ~ 93.556
-    assert mps20_handler.data.samples[0] == pytest.approx(93.556, abs=1e-2)
+    assert mps20_handler.data.samples[0] == pytest.approx(1.214, abs=1e-2)
 
 
 def test_mps20_handle_ignores_wrong_prefix(mps20_handler):
@@ -292,28 +297,17 @@ def test_mps20_handle_ignores_wrong_prefix(mps20_handler):
 
 
 def test_mps20_custom_calibration():
-    """Valida se o handler respeita offsets e sensibilidades customizadas."""
-    # Usando valores realistas para 24 bits
-    v_ref = 5.0
-    offset = 0.0  # offset não é mais usado
-    sensitivity = 2.0
-
+    """Valida se o handler respeita a nova fórmula fixa independente dos parâmetros passados no __init__ (conforme implementação atual)."""
+    # Atualmente a fórmula em handlers.py usa constantes fixas locais ao método _convert.
     custom_handler = MPS20Handler(
         data=DataStream(10),
         data_buffer=DataStream(10),
         time_series=DataStream(10),
-        adc_max=4095,  # Não usado na fórmula fixa de 24 bits
-        v_ref=v_ref,
-        offset=offset,
-        sensitivity=sensitivity
+        adc_max=4095,
+        v_ref=5.0
     )
 
-    # Simula um valor de ADC que resultaria em 15.0 mV no sensor
-    # v_sensor_mv = 15.0 -> v_no_adc_mv = 15.0 * 128 = 1920.0
-    # adc = (1920.0 * 2**24) / (v_ref * 1000)
-    adc_target = int((1920.0 * (2**24)) / (v_ref * 1000))
-
-    # Com a nova fórmula simplificada (adc / 1000), o valor esperado é simplesmente o ADC / 1000
-    expected_pressure = adc_target / 1000.0
+    adc_target = 5000000
+    expected_pressure = (adc_target - 4075138) * 0.001313 / 1000.0
     assert custom_handler._convert(adc_target) == pytest.approx(
         expected_pressure, abs=1e-2)

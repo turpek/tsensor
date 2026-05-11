@@ -1,32 +1,8 @@
 import numpy as np
-from tsensor.core.utils import detrend, histogram, Stat, numpy_histogram, hybrid_histogram, AcquisitionGate
+from tsensor.core.utils import detrend, histogram, Stat, numpy_histogram, hybrid_histogram
 
 
-def test_acquisition_gate_default_returns_true():
-    """Sem chamar enable(), wait() deve retornar True (comportamento padrão)."""
-    gate = AcquisitionGate()
-    assert gate.wait() is True
-
-
-def test_acquisition_gate_synced_behavior():
-    """Com enable() ativo, wait() deve retornar o valor enviado por signal()."""
-    gate = AcquisitionGate()
-    gate.enable()
-
-    gate.signal(True)
-    assert gate.wait() is True
-
-    gate.signal(False)
-    assert gate.wait() is False
-
-
-def test_acquisition_gate_handles_empty_queue():
-    """Com enable() ativo mas sem sinal, wait() deve retornar False após timeout (evita travar)."""
-    gate = AcquisitionGate()
-    gate.enable()
-
-    # Não sinalizamos nada. O timeout curto garante que o teste não fique preso.
-    assert gate.wait(timeout=0.1) is False
+# --- Testes de Estatística ---
 
 
 def test_stat_initialization():

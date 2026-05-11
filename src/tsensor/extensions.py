@@ -1,8 +1,8 @@
 from loguru import logger
 from tsensor.core.data_stream import DataStream
-from tsensor.core.sheets import SheetsManager
+from tsensor.core.sheets import SheetsManager, SyncCoordinator
 from tsensor.core.handlers import StreamManager, HANDLERS, SheetsHandler, TimestampHandler
-from tsensor.core.utils import load_config, AcquisitionGate
+from tsensor.core.utils import load_config
 
 import threading
 import os
@@ -10,8 +10,11 @@ import os
 # Carrega as configurações globais
 config = load_config()
 
-# Objeto global para sincronizar as classe de leitura (serial/sheets)
-acq_gate = AcquisitionGate()
+# Parâmetros de sincronização
+_total_samples_limit = config["acquisition"].get("total_samples", 1000)
+
+# Objeto global para coordenar cursores e transição de modo
+sync_coordinator = SyncCoordinator(_total_samples_limit)
 
 # Tenta carregar latência média persistida
 _initial_latency = 0.0

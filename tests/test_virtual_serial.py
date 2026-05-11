@@ -19,6 +19,9 @@ def test_virtual_serial_readline_format(mocker):
 def test_virtual_serial_values_within_range(mocker):
     """Valida se os valores gerados estão coerentes com a tabela de hardware (ESP32)."""
     mocker.patch("time.sleep")  # Acelera o teste
+    # Mocka random.random para SEMPRE retornar 1.0 (evita entrar no bloco de falha de 20%)
+    mocker.patch("tsensor.core.serial_connection.random.random",
+                 return_value=1.0)
 
     # Mock da config com DOIS sensores ativos para testar o novo formato T=NUM,P=NUM
     mock_config = {

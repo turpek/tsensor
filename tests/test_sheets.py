@@ -110,17 +110,25 @@ def test_revert_rows():
     # Range: A1:B5 (row=1, end_row=5)
 
     sr.revert_rows(2)
-    # Deve recuar end_row em 2 -> end_row = 3
-    # Então próximo major_row inicia no 4
+    # Novo comportamento: recua row e end_row.
+    # row=1-2 -> 1. end_row=5-2 -> 3.
+    assert sr.row == 1
+    assert sr._end_row == 3
+
+    # Próximo major_row inicia no 4 (end_row + 1)
     sr.major_row(5, 2)
     # Range novo: A4:B8
     assert sr.to_a1() == "A4:B8"
 
     sr.revert_rows(10)
-    # Deve recuar end_row em 10 -> end_row = 8 - 10 = -2 -> forçado a 0
-    # Próximo major_row inicia no 1
+    # 4-10 -> 1. 8-10 -> 1.
+    assert sr.row == 1
+    assert sr._end_row == 1
+
+    # Próximo major_row inicia no 1 (is_first foi resetado? Não, mas end_row=1 então inicia em 2)
+    # Se is_first for False, inicia em end_row + 1 = 2.
     sr.major_row(5, 2)
-    assert sr.to_a1() == "A1:B5"
+    assert sr.to_a1() == "A2:B6"
 
 # --- Testes de Integração: SheetsManager ---
 
@@ -247,3 +255,61 @@ def test_sheets_manager_setup_new_login(mock_sheets_deps):
         "creds.json", ["https://www.googleapis.com/auth/spreadsheets"]
     )
     assert mock_sheets_deps["open"].called
+
+
+def test_sheets_manager_delete_rows_calls_batch_update(mock_sheets_deps, mocker):
+    """Verifica se delete_rows chama a API com os índices e sheetId corretos."""
+    manager = SheetsManager()
+    mock_sheet_service = mocker.Mock()
+    manager._sheet = mock_sheet_service
+
+    # Mock do retorno do get() para encontrar o sheetId da aba
+    mock_sheet_service.get.return_value.execute.return_value = {
+        'sheets': [{
+            'properties': {'title': 'Página1', 'sheetId': 12345}
+        }]
+    }
+
+    # Executa a deleção de 50 linhas a partir da linha 2 (índice 1)
+    manager.delete_rows(start=2, count=50)
+
+    assert mock_sheet_service.batchUpdate.called
+    call_args = mock_sheet_service.batchUpdate.call_args[1]
+
+    # A API usa 0-based: start 2 -> index 1. end 51 -> index 51 (exclusivo)
+    expected_request = {
+        'deleteRange': {
+            'range': {
+                'sheetId': 12345,
+                'dimension': 'ROWS',
+                'startRowIndex': 1,
+                'endRowIndex': 51
+            },
+            'shiftDimension': 'ROWS'
+        }
+    }
+    assert call_args['body']['requests'][0] == expected_request
+
+
+def test_sliding_window_cursor_logic():
+    """Valida a manipulação manual do cursor para compensar o deslocamento da janela deslizante."""
+    sr = SpreadSheetRange(row=951)
+    batch_size = 50
+
+    # Avança para o final do lote (951:1000)
+    sr.major_row(batch_size, 3)
+    assert sr._row == 951
+    assert sr._end_row == 1000
+
+    # Ao deletar 50 linhas do topo, as linhas na memória devem "recuar"
+    # para que o próximo major_row aponte para o lugar correto
+    sr._row -= batch_size
+    sr._end_row -= batch_size
+
+    assert sr._row == 901
+    assert sr._end_row == 950
+
+    # Próximo avanço volta para a posição correta de append
+    sr.major_row(batch_size, 3)
+    assert sr._row == 951
+    assert sr._end_row == 1000
