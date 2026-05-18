@@ -12,5 +12,4 @@ exports
 tmp
 scripts/
 .venv/
-src/tsensor/anicrop/
 *.egg-info/
