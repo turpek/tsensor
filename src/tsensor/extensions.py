@@ -1,11 +1,12 @@
 from loguru import logger
 from tsensor.core.data_stream import DataStream
 from tsensor.core.sheets import SheetsManager, SyncCoordinator
-from tsensor.core.handlers import StreamManager, HANDLERS, SheetsHandler, TimestampHandler
+from tsensor.core.handlers import StreamManager, SerialManager, HANDLERS, TimestampHandler
 from tsensor.core.utils import load_config
 
 import threading
 import os
+import re
 
 # Carrega as configurações globais
 config = load_config()
@@ -54,16 +55,15 @@ col_count = 1 + len(config.get('sensors', []))
 sheet_manager.setup(row_count=total_samples + 1, col_count=col_count)
 
 
-def setup_serial_manager(config: dict) -> StreamManager:
-    """Configura um StreamManager local para aquisição Serial em lotes."""
-    serial_manager = StreamManager()
+def setup_serial_manager(config: dict) -> SerialManager:
+    """Configura um SerialManager local para aquisição Serial em lotes."""
+    serial_manager = SerialManager()
 
     # Parâmetros para o modo Serial
     batch_limit = config["acquisition"].get("serial_batch_size", 50)
 
     serial_manager.configure(
-        timeout=config["acquisition"].get("max_runtime_sec"),
-        total_samples=None,  # O controle de parada será externo ou via is_active global
+        timeout=config["acquisition"].get("max_runtime_sec")
     )
 
     # Adiciona o TimestampHandler como primeiro da fila
@@ -78,7 +78,6 @@ def setup_serial_manager(config: dict) -> StreamManager:
     serial_manager.add_handler("timestamp", ts_handler)
 
     for sensor in config.get('sensors', []):
-
         sensor_model = sensor.get("model")
         if sensor_model not in HANDLERS:
             continue
@@ -105,6 +104,7 @@ def setup_serial_manager(config: dict) -> StreamManager:
 
 
 def setup_manager(config: dict) -> StreamManager:
+    """Configura o StreamManager global para o Dashboard via Google Sheets."""
     # Configura os limites globais
     manager.configure(
         timeout=config["acquisition"].get("max_runtime_sec"),
@@ -115,43 +115,78 @@ def setup_manager(config: dict) -> StreamManager:
     buffer_limit = config["acquisition"].get("buffer_samples", 1000)
     timeseries_limit = config["acquisition"].get("timeseries_samples", 480)
 
-    # Adiciona o SheetsHandler para a coluna de tempo (Coluna A da Planilha)
-    ts_handler = SheetsHandler(
-        data=DataStream(total_samples=session_limit),
-        data_buffer=DataStream(total_samples=buffer_limit),
-        time_series=DataStream(total_samples=timeseries_limit),
-        name="timestamp",
-        adc_max=0,
-        v_ref=0.0
-    )
-    manager.add_handler("timestamp", ts_handler)
+    # Tenta descobrir o cabeçalho real da planilha
+    header_values = []
+    try:
+        from tsensor.core.sheets import SpreadSheetRange
+        header_range = SpreadSheetRange(row=1, col=1)
+        header_range.major_row(1, 26)
+        with sheets_lock:
+            res = sheet_manager.fetch_data(header_range)
+        val_ranges = res.get('valueRanges', [])
+        header_values = val_ranges[0].get('values', [[]])[0] if val_ranges else []
+    except Exception:
+        logger.warning("Não foi possível ler o cabeçalho do Sheets. Usando config local.")
 
-    for sensor in config.get('sensors', []):
-        sensor_model = sensor.get("model")
-        if sensor_model not in HANDLERS:
-            logger.error(f"Modelo de sensor desconhecido: {sensor_model}")
-            continue
+    # Limpa handlers antigos
+    manager._handlers = {}
 
-        data_stream = DataStream(total_samples=session_limit)
-        data_buffer = DataStream(total_samples=buffer_limit)
-        time_series = DataStream(total_samples=timeseries_limit)
+    # Se descobriu cabeçalho, usa a ordem da planilha
+    if header_values:
+        logger.info(f"Configurando Dashboard via cabeçalho Sheets: {header_values}")
+        for col in header_values:
+            # 1. Verifica primeiro se é o timestamp (Coluna A)
+            if "timestamp" in col.lower():
+                h = TimestampHandler(
+                    data=DataStream(total_samples=session_limit),
+                    data_buffer=DataStream(total_samples=buffer_limit),
+                    time_series=DataStream(total_samples=timeseries_limit),
+                    name="timestamp",
+                    adc_max=0, v_ref=0.0
+                )
+                manager.add_handler("timestamp", h)
+                continue
 
-        kwargs = sensor.get('calibration', {})
-        name = sensor.get('name')
-
-        handler = SheetsHandler(
-            data=data_stream,
-            data_buffer=data_buffer,
-            time_series=time_series,
-            name=name,
-            adc_max=kwargs.get('adc_max', 4095),
-            v_ref=kwargs.get('v_ref', 3.3)
+            # 2. Se não for timestamp, tenta casar com o padrão de sensor tipo[nome]
+            match = re.match(r"(\w+)\[(.*)\]", col)
+            if match:
+                s_type, s_name = match.groups()
+                sensor_cfg = next((s for s in config.get('sensors', []) if s['name'] == s_name), None)
+                model = sensor_cfg['model'] if sensor_cfg else None
+                if model in HANDLERS:
+                    h = HANDLERS[model](
+                        data=DataStream(total_samples=session_limit),
+                        data_buffer=DataStream(total_samples=buffer_limit),
+                        time_series=DataStream(total_samples=timeseries_limit),
+                        adc_max=0, v_ref=0.0
+                    )
+                    manager.add_handler(s_name, h)
+    
+    # Se não há cabeçalho ou falhou, usa a configuração local como fallback
+    if not manager._handlers:
+        logger.info("Configurando Dashboard via configuração local (fallback).")
+        ts_handler = TimestampHandler(
+            data=DataStream(total_samples=session_limit),
+            data_buffer=DataStream(total_samples=buffer_limit),
+            time_series=DataStream(total_samples=timeseries_limit),
+            name="timestamp",
+            adc_max=0, v_ref=0.0
         )
-        manager.add_handler(name, handler)
+        manager.add_handler("timestamp", ts_handler)
 
-    if len(manager) <= 1:
-        raise RuntimeError(
-            "Nenhum sensor válido foi configurado para aquisição.")
+        for sensor in config.get('sensors', []):
+            model = sensor.get("model")
+            if model in HANDLERS:
+                h = HANDLERS[model](
+                    data=DataStream(total_samples=session_limit),
+                    data_buffer=DataStream(total_samples=buffer_limit),
+                    time_series=DataStream(total_samples=timeseries_limit),
+                    adc_max=0, v_ref=0.0
+                )
+                manager.add_handler(sensor['name'], h)
+
+    if len(manager) < 1:
+        raise RuntimeError("Nenhum sensor válido foi configurado para visualização.")
 
     return manager
 

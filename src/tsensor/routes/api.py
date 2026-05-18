@@ -347,7 +347,8 @@ def download_charts_zip():
         return jsonify({"error": "Nenhum sensor configurado."}), 400
 
     # Mapeamento de unidades
-    units = {"temperature": "°C", "pressure": "kPa"}
+    units = {"temperature": "°C", "pressure": "kPa",
+             "radar_angle": "°", "radar_distance": "cm"}
 
     # Busca o handler de timestamp para gerar os labels globais
     ts_handler = manager.get_handler("timestamp")

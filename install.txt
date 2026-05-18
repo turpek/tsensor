@@ -1,6 +1,0 @@
-flask
-pyserial
-loguru
-toml
-pygame
-anicrop @ git+https://github.com/turpek/anicrop.git

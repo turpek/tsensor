@@ -64,6 +64,8 @@ def get_sensor_models() -> dict:
     return {
         "temperature": ["LM35", "NTC"],
         "pressure": ["MPS20N0040D"],
+        "radar_angle": ["RADAR_ANGLE"],
+        "radar_distance": ["RADAR_DISTANCE"],
     }
 
 

@@ -1,6 +1,11 @@
 import pygame
+import matplotlib.pyplot as plt
+import numpy as np
 import math
 from loguru import logger
+from tsensor.anicrop.spatial import Region, bbox_to_region
+from tsensor.anicrop.transform import Transform, calculate_new_bbox, transform_points
+
 
 # from anicrop.transform import TransformComposer, calculate_new_corners, corners_to_bbox
 
@@ -18,6 +23,11 @@ class RadarGUI:
 
         self.width = width
         self.height = height
+        self._window = Region.from_size(width, height)
+
+        origin = (width // 2, height // 2)
+        self._origin = Region.from_size(*origin) + origin
+
         # Tenta criar a janela. Se já existir, usa a atual.
         try:
             self.screen = pygame.display.set_mode((self.width, self.height))
@@ -26,9 +36,24 @@ class RadarGUI:
 
         pygame.display.set_caption("TSENSOR | Radar de Monitoramento")
 
-        # Fontes
-        self.font_small = pygame.font.SysFont("OCRAExtended", 20)
-        self.font_large = pygame.font.SysFont("OCRAExtended", 35)
+        # Fallback Robusto para Fontes (especial para Python 3.14 / Arch)
+        try:
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                if not pygame.font.get_init():
+                    pygame.font.init()
+                self.font_small = pygame.font.Font(None, 20)
+                self.font_large = pygame.font.Font(None, 35)
+        except (AttributeError, NotImplementedError, ImportError, pygame.error, Exception) as e:
+            logger.warning(
+                f"Módulo de fonte indisponível no Pygame ({e}). O radar funcionará sem textos.")
+
+            class DummyFont:
+                def render(self, *args, **kwargs):
+                    return pygame.Surface((1, 1), pygame.SRCALPHA)
+            self.font_small = DummyFont()
+            self.font_large = DummyFont()
 
         # Estado do Radar
         self.angle = 0
@@ -60,14 +85,25 @@ class RadarGUI:
 
     def _draw_grid_lines(self):
         """Desenha as linhas de grade (ângulos)."""
-        angles = [30, 60, 90, 120, 150]
+
         line_len = self.width // 2
-        for a in angles:
+        line = Region.from_size(line_len, 1)
+        rot = Transform().translate(self.origin_x, self.origin_y)
+
+        angles = [30, 60, 90, 120, 150]
+        angles_b = [-30, -60, -90, -120, -150][::-1]
+        for a, ab in zip(angles, angles_b):
             rad = math.radians(a)
             end_x = self.origin_x + line_len * math.cos(math.pi - rad)
             end_y = self.origin_y - line_len * math.sin(math.pi - rad)
+            mat = rot.rotate(ab, 0, 0).get_matrix(line.size)
+            start, end = transform_points(
+                mat, [line.top_left, line.bottom_right])
             pygame.draw.line(self.screen, GREEN, (self.origin_x,
                              self.origin_y), (end_x, end_y), 2)
+            # print(f'angulo = {a} {ab}')
+            # print(f'anicrop;  ({int(start[0])},{int(start[1])}), ({int(end[0])},{int(end[1])})')
+            # print(f'tradic;  ({int(self.origin_x)},{int(self.origin_y)}), ({int(end_x)},{int(end_y)})\n')
 
         # Linha base (horizontal)
         pygame.draw.line(self.screen, GREEN, (0, self.origin_y),
@@ -145,6 +181,75 @@ class RadarGUI:
     def close(self):
         pygame.quit()
 
+class EduRadarGUI:
+    """
+    Interface de Radar baseada no modelo Matplotlib Polar (@Edu_radar.py).
+    """
+    def __init__(self, distancia_max=40):
+        self.distancia_max = distancia_max
+
+        # Ativa o modo interativo do Matplotlib
+        plt.ion()
+        self.fig = plt.figure(facecolor='black', figsize=(8, 6))
+        self.fig.canvas.manager.set_window_title('Radar ESP32 - Tempo Real')
+
+        # Configuração do gráfico polar
+        self.ax = self.fig.add_subplot(111, polar=True, facecolor='black')
+        self.ax.tick_params(colors='lime')
+        self.ax.grid(color='lime', alpha=0.3)
+        self.ax.set_thetamin(0)
+        self.ax.set_thetamax(180)
+        self.ax.set_ylim(0, self.distancia_max)
+
+        # Dados iniciais (0 a 180 graus)
+        self.angulos = np.radians(np.arange(0, 181, 1))
+        self.distancias = np.full(181, float(self.distancia_max))
+
+        # Elementos gráficos
+        self.linha, = self.ax.plot(self.angulos, self.distancias, color='red', linewidth=2)
+        self.ponto_atual, = self.ax.plot([0], [float(self.distancia_max)], 'yo', markersize=8)
+
+        logger.info(f"EduRadarGUI inicializado (Distância Máx: {distancia_max}cm)")
+
+    def update(self, angle: int, distance: int):
+        """
+        Atualiza o radar com novo ângulo e distância.
+        Simula o comportamento do loop em @Edu_radar.py.
+        """
+        # Verifica se a figura ainda existe
+        if not plt.fignum_exists(self.fig.number):
+            return
+
+        # Lógica de saturação do modelo Edu
+        if distance > self.distancia_max or distance <= 0:
+            dist_val = self.distancia_max
+        else:
+            dist_val = distance
+
+        # Atualiza o histórico de distâncias se o ângulo for válido
+        if 0 <= angle <= 180:
+            self.distancias[angle] = dist_val
+
+            # Atualiza os dados das séries no gráfico
+            self.linha.set_ydata(self.distancias)
+            self.ponto_atual.set_data([np.radians(angle)], [dist_val])
+
+            # Atualiza o desenho sem bloquear (equivalente ao plt.pause)
+            try:
+                self.fig.canvas.draw_idle()
+                self.fig.canvas.flush_events()
+            except Exception:
+                pass
+
+    def close(self):
+        """Fecha a janela do radar de forma limpa."""
+        try:
+            plt.close(self.fig)
+            plt.ioff()
+            logger.info("EduRadarGUI encerrado.")
+        except Exception:
+            pass
+
 
 if __name__ == "__main__":
     # Teste rápido manual
@@ -153,4 +258,6 @@ if __name__ == "__main__":
     for a in range(0, 180):
         radar.update(a, 20 if a % 10 == 0 else 50)
         time.sleep(0.05)
+        if a == 2:
+            break
     radar.close()

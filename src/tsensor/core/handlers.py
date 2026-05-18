@@ -27,10 +27,10 @@ class SerialHandler(Protocol):
     ):
         ...
 
-    def str_to_float(self, line: str) -> None | float:
+    def convert(self, line: str) -> float | str:
         ...
 
-    def handle(self, line: str | float) -> bool:
+    def update(self, line: str | float) -> bool:
         ...
 
     @property
@@ -62,7 +62,7 @@ class SheetsHandler:
         self._time_series = time_series
         self._name = name
 
-    def handle(self, line: Iterator) -> bool:
+    def update(self, line: Iterator) -> bool:
         line = float(next(line))
         logger.debug(f"{self._name}: {line:.4f}")
         self._data.add(line)
@@ -74,6 +74,12 @@ class SheetsHandler:
             return float(line)
         except (ValueError, TypeError):
             return None
+
+    def convert(self, line: str) -> float | str:
+        val = self.str_to_float(line)
+        if val is not None:
+            return val
+        return ""
 
     @property
     def data_buffer(self) -> DataStream:
@@ -121,13 +127,19 @@ class PressureHandler(ABC):
     def _convert(self, adc: float):
         ...
 
-    def handle(self, line: str) -> bool:
-        adc = self.str_to_float(line)
-        if adc is not None:
-            pressure = self._convert(adc)
+    def convert(self, line: str) -> float | str:
+        val = self.str_to_float(line)
+        if val is not None:
+            pressure = self._convert(val)
             logger.debug(f"pressao: {pressure:.4f}")
-            self._data.add(pressure)
-            self._data_buffer.add(pressure)
+            return pressure
+        return ""
+
+    def update(self, line: str) -> bool:
+        if line:
+            val = float(line)
+            self._data.add(val)
+            self._data_buffer.add(val)
             return True
         return False
 
@@ -170,19 +182,25 @@ class TemperatureHandler(ABC):
         return None
 
     def _check_adc(self, adc: float) -> bool:
-        return 0 < adc < self._adc_max
+        return 0 <= adc <= self._adc_max
+
+    def convert(self, line: str) -> float | str:
+        val = self.str_to_float(line)
+        if val is not None:
+            temperature = self._convert(val)
+            logger.debug(f"temperatura: {temperature:.4f}")
+            return temperature
+        return ""
 
     @abstractmethod
     def _convert(self, adc: float):
         ...
 
-    def handle(self, line: str) -> bool:
-        adc = self.str_to_float(line)
-        if adc is not None and self._check_adc(adc):
-            temperature = self._convert(adc)
-            logger.debug(f"temperatura: {temperature:.4f}")
-            self._data.add(temperature)
-            self._data_buffer.add(temperature)
+    def update(self, line: str) -> bool:
+        if line:
+            val = float(line)
+            self._data.add(val)
+            self._data_buffer.add(val)
             return True
         return False
 
@@ -235,6 +253,88 @@ class MPS20Handler(PressureHandler):
         return round(press, 4)
 
 
+class RadarDataHandler:
+    def __init__(
+        self,
+        data: Optional[DataStream] = None,
+        data_buffer: Optional[DataStream] = None,
+        time_series: Optional[DataStream] = None,
+        adc_max: int = 4095,
+        v_ref: float = 3.3,
+        prefix: str = "A"
+    ):
+        self._data = data if data else DataStream(total_samples=1000000)
+        self._data_buffer = data_buffer if data_buffer else DataStream(total_samples=1)
+        self._time_series = time_series if time_series else DataStream(total_samples=1)
+        self._adc_max = adc_max
+        self._v_ref = v_ref
+        self.prefix = prefix
+        self.value: int = 0
+        self._re = re.compile(f"{prefix}={REG_ADC_VALUE}")
+
+    def str_to_float(self, line: str) -> None | float:
+        match = self._re.search(line)
+        if match:
+            try:
+                return float(match.group(1))
+            except (ValueError, TypeError):
+                return None
+        return None
+
+    def _check_adc(self, adc: float) -> bool:
+        return 0 <= adc <= self._adc_max
+
+    def update(self, line: str) -> bool:
+        if line:
+            val = float(line)
+            self._data.add(val)
+            self._data_buffer.add(val)
+            return True
+        return False
+
+    def convert(self, line: str) -> float | str:
+        val = self.str_to_float(line)
+        if val is not None:
+            return self._convert(val)
+        return ""
+
+    @property
+    def data(self) -> DataStream:
+        return self._data
+
+    @property
+    def data_buffer(self) -> DataStream:
+        return self._data_buffer
+
+    @property
+    def time_series(self) -> DataStream:
+        return self._time_series
+
+
+class RadarAngleHandler(RadarDataHandler):
+    def __init__(self, *args, **kwargs):
+        if "prefix" not in kwargs:
+            kwargs["prefix"] = "A"
+        super().__init__(*args, **kwargs)
+
+    def _convert(self, adc: float):
+        angle = float(adc)
+        logger.debug(f"angle: {angle:.4f}")
+        return angle
+
+
+class RadarDistanceHandler(RadarDataHandler):
+    def __init__(self, *args, **kwargs):
+        if "prefix" not in kwargs:
+            kwargs["prefix"] = "D"
+        super().__init__(*args, **kwargs)
+
+    def _convert(self, adc: float):
+        dist = float(adc)
+        logger.debug(f"distancia: {adc:.4f}")
+        return dist
+
+
 class TimestampHandler:
     _re = re.compile(f"U={REG_ADC_VALUE}")
 
@@ -253,35 +353,34 @@ class TimestampHandler:
         self._name = name
 
     @classmethod
-    def convert(cls, line: str) -> float | None:
+    def convert_raw(cls, line: str) -> float | None:
+        """Extrai o timestamp bruto (U=...) da linha."""
         match = cls._re.search(line)
         if match:
-            ts = float(match.group(1))
-            return ts
-
-    def str_to_float(self, line: str) -> None | float:
-        match = self._re.search(line)
-        if match:
-            try:
-                return float(match.group(1))
-            except (ValueError, TypeError):
-                return None
+            return float(match.group(1))
         return None
 
-    def _convert(self, line: str) -> float:
-        match = self._re.search(line)
-        if match:
-            ts = sync_time.get_real(float(match.group(1)))
-            return ts
-        else:
-            return time()
+    def str_to_float(self, line: str) -> None | float:
+        return self.convert_raw(line)
 
-    def handle(self, line: str) -> bool:
-        line = self._convert(line)
-        logger.debug(f"{self._name}: {line:.4f}")
-        self._data.add(line)
-        self._data_buffer.add(line)
-        return True
+    def _convert(self, val: float) -> float | str:
+        ts = sync_time.get_real(val)
+        logger.debug(f"timestamp: {ts:.4f}")
+        return ts
+
+    def convert(self, line: str) -> float | str:
+        val = self.str_to_float(line)
+        if val is not None:
+            return self._convert(val)
+        return time()
+
+    def update(self, line: str) -> bool:
+        if line:
+            val = float(line)
+            self._data.add(val)
+            self._data_buffer.add(val)
+            return True
+        return False
 
     @property
     def data_buffer(self) -> DataStream:
@@ -336,12 +435,12 @@ class StreamManager:
                 return False
         return True
 
-    def dispatch(self, line: str | Iterator) -> None:
-        counts = [self._count]
-        for handler in self._handlers.values():
-            handler.handle(line)
-            counts.append(len(handler.data))
-        self._count = max(counts)
+    def dispatch(self, row: list) -> None:
+        # row é a linha da planilha [colunaA, colunaB, ...]
+        # zip pareia cada handler com seu valor correspondente na linha
+        for handler, val in zip(self._handlers.values(), row):
+            handler.update(val)
+        self._count += 1
 
     def stop(self) -> None:
         self._active = False
@@ -363,32 +462,44 @@ class StreamManager:
         return self._active
 
 
-# Handlers especiais para o Radar (uso local, não vão para o Sheets)
-class RadarDataHandler:
-    def __init__(self, prefix: str):
-        self.prefix = prefix
-        self.value: int = 0
-        self._re = re.compile(f"{prefix}={REG_ADC_VALUE}")
-
-    def handle(self, line: str) -> bool:
-        match = self._re.search(line)
-        if match:
-            try:
-                self.value = int(float(match.group(1)))
-                return True
-            except (ValueError, IndexError):
-                pass
-        return False
-
-
-class RadarAngleHandler(RadarDataHandler):
+class SerialManager:
     def __init__(self):
-        super().__init__("A")
+        self._handlers: dict[str, SerialHandler] = {}
+        self.table: list[list] = []
+        self._timeout: Optional[int] = None
+        self._start: float = time()
+        self._active: bool = False
 
+    def configure(self, timeout: Optional[int] = None):
+        self._timeout = timeout
+        self._start = time()
+        self._active = True
+        self._handlers = {}
+        self.table = []
 
-class RadarDistanceHandler(RadarDataHandler):
-    def __init__(self):
-        super().__init__("D")
+    def add_handler(self, name: str, handler: SerialHandler) -> None:
+        self._handlers[name] = handler
+
+    def dispatch(self, line: str) -> None:
+        # Cria a linha chamando convert em cada handler
+        row = [h.convert(line) for h in self._handlers.values()]
+
+        # O primeiro elemento é o timestamp.
+        # Só adicionamos a linha se houver pelo menos um dado de sensor real.
+        if any(val != "" for val in row[1:]):
+            self.table.append(row)
+
+    def stop(self) -> None:
+        self._active = False
+
+    @property
+    def is_active(self) -> bool:
+        if self._timeout is not None and (time() - self._start > self._timeout):
+            return False
+        return self._active
+
+    def __len__(self) -> int:
+        return len(self._handlers)
 
 
 # Mapeamento global de handlers disponíveis para configuração via TOML
@@ -396,4 +507,6 @@ HANDLERS = {
     "LM35": LM35Handler,
     "NTC": NTCHandler,
     "MPS20N0040D": MPS20Handler,
+    "RADAR_ANGLE": RadarAngleHandler,
+    "RADAR_DISTANCE": RadarDistanceHandler,
 }
