@@ -1,9 +1,9 @@
 from loguru import logger
 from tsensor.core.serial_connection import Serial, SerialException
 from tsensor.core.handlers import StreamManager, sync_time, TimestampHandler, RadarAngleHandler, RadarDistanceHandler
-from tsensor.core.sheets import SheetsManager
+from tsensor.core.sheets import SheetsManager, export_header
 from tsensor.core.gui_radar import RadarGUI
-from tsensor.core.utils import Timer
+from tsensor.core.utils import att_latency, service_connection, sheets_export, Timer
 from tsensor.extensions import app_status, sync_coordinator, config, setup_serial_manager, sheets_lock
 from queue import Queue, Empty
 import time
@@ -69,60 +69,30 @@ def serial_reading(
     port: str, baudrate: int, stream_manager: StreamManager, timeout: float = 1.0
 ) -> None:
     """Aquisição Serial em tempo real com exportação em lotes para o Google Sheets."""
-    try:
-        ser = Serial(port, baudrate, timeout=timeout)
-        app_status["connected"] = True
-        app_status["error"] = None
-        logger.info(f"Conexão serial estabelecida em {port} (Tempo Real)")
-    except SerialException as e:
-        app_status["connected"] = False
-        app_status["error"] = str(e)
-        logger.error(f"Erro ao abrir porta serial {port}: {e}")
+
+    msg = f"Conexão serial estabelecida em {port} (Tempo Real)"
+    ser = service_connection(Serial, app_status, msg, port=port, baudrate=baudrate)
+    if ser is None:
         return None
 
-    # NOVO: Gerenciador Serial focado em tabelas assíncronas
-    from tsensor.core.handlers import SerialManager
-    local_manager = SerialManager()
-
-    # Re-configura o local_manager com base no config
-    local_manager.configure(
-        timeout=config["acquisition"].get("max_runtime_sec"))
-
-    # Adiciona os handlers ao local_manager (mesma lógica do setup_serial_manager)
-    # mas focada no novo manager que gerencia a 'table'
-    temp_manager = setup_serial_manager(config)
-    for name, handler in temp_manager._handlers.items():
-        local_manager.add_handler(name, handler)
+    local_manager = setup_serial_manager(config)
 
     batch_size = config["acquisition"].get("serial_batch_size", 50)
     sync_coordinator.batch_size = batch_size
+    # Sincroniza o leitor com a posição inicial de escrita da nova sessão
+    sync_coordinator.sync_cursors()
+    export_cursor = sync_coordinator.write_cursor
 
     # Gerenciador de exportação local
     sheet = SheetsManager()
-    total_samples = config["acquisition"].get("total_samples", 1000)
-    col_count = 1 + len(config.get('sensors', []))
-    sheet.setup(row_count=total_samples + 1, col_count=col_count)
-    export_cursor = sync_coordinator.write_cursor
+    total_samples = local_manager.total_samples
+    sheet.setup(row_count=total_samples + 1, col_count=len(local_manager))
 
     # Exportação do Cabeçalho Dinâmico
-    from tsensor.core.sheets import SpreadSheetRange
-    header = ["timestamp[tempo]"]
-    for s in config.get('sensors', []):
-        header.append(f"{s.get('type', 'sensor')}[{s.get('name', 's')}]")
-
-    with sheets_lock:
-        header_cursor = SpreadSheetRange(row=1, col=1)
-        header_cursor.major_row(1, len(header))
-        sheet.export([header], header_cursor)
-
-    # Fila para comunicação entre threads
-    data_queue = Queue()
+    export_header(sheet, local_manager, sheets_lock)
 
     synchronize_time(ser)
     logger.info(f"Iniciando coleta Serial (Modo ROWS Export: {batch_size})...")
-
-    # Dispara a thread do Radar
-    start_radar_thread(ser, stream_manager, data_queue)
 
     # Controle de exportação não-bloqueante
     export_timer = Timer()
@@ -130,37 +100,17 @@ def serial_reading(
     try:
         ser.reset_input_buffer()
         while stream_manager.is_active:
-            try:
-                line = data_queue.get(timeout=0.1)
-            except Empty:
-                continue
+            line = ser.readline().decode("utf-8", errors="ignore").strip()
 
-            # Despacha para o manager local que monta a tabela
             local_manager.dispatch(line)
 
             # Verifica se o lote está pronto na tabela interna
             if len(local_manager.table) >= batch_size and export_timer.elapsed(1.0):
-                actual_batch = len(local_manager.table)
-                num_handlers = len(local_manager)
 
-                # Janela Deslizante
-                sync_coordinator.on_write_batch(
-                    sheet, actual_batch, sheets_lock)
-
-                logger.info(
-                    f"Exportando {actual_batch} linhas para o Sheets...")
-
-                # Calcula latência (baseada no último timestamp da tabela)
-                if actual_batch > 0:
-                    last_row = local_manager.table[-1]
-                    if isinstance(last_row[0], (int, float)):
-                        app_status["batch_latency"] = time.time() - last_row[0]
-
-                # Exporta usando ROWS (mais robusto para frequências variadas)
-                with sheets_lock:
-                    export_cursor.major_row(actual_batch, num_handlers)
-                    sheet.export(local_manager.table,
-                                 export_cursor, major_mode='ROWS')
+                att_latency(local_manager, app_status)
+                sheets_export(
+                    local_manager, sheet, export_cursor, sheets_lock, sync_coordinator
+                )
 
                 # Limpa a tabela para o próximo lote
                 local_manager.table.clear()
@@ -177,17 +127,11 @@ def sheets_reading(
     stream_manager: StreamManager, timeout: float = 1.0
 ) -> None:
     """Realiza a leitura do Google Sheets de forma síncrona."""
-    try:
-        sheet = SheetsManager()
-        sheet.setup()
-        app_status["connected"] = True
-        app_status["error"] = None
-        logger.info("Conexão estabelecida no Google Sheets")
-    except Exception as e:
-        app_status["connected"] = False
-        app_status["error"] = str(e)
-        logger.error("Erro ao tentar se conectar ao Google Sheets")
+    msg = "Conexão estabelecida no Google Sheets"
+    sheet = service_connection(SheetsManager, app_status, msg)
+    if sheet is None:
         return None
+    sheet.setup()
 
     # Cursor de leitura coordenado
     read_cursor = sync_coordinator.read_cursor
@@ -199,15 +143,10 @@ def sheets_reading(
     radar_gui = None
     has_radar = stream_manager.get_handler("angle") and stream_manager.get_handler("dist")
     if has_radar:
-        try:
-            radar_gui = RadarGUI(width=1280, height=720)
-            logger.info("RadarGUI iniciado via Google Sheets.")
-        except Exception as e:
-            logger.warning(f"Não foi possível iniciar o RadarGUI: {e}")
-
+        radar_gui = RadarGUI(width=1280, height=720)
     # Mapeamento de índices dos sensores de radar
-    h_names = [name for name in stream_manager._handlers.keys()] if hasattr(stream_manager, "_handlers") else []
-    
+    h_names = [name for name in stream_manager.handlers.keys()]
+
     def get_idx(name_list, targets):
         for t in targets:
             if t in name_list:
@@ -260,8 +199,12 @@ def sheets_reading(
                         if len(lines) < batch_size:
                             unread = batch_size - len(lines)
                             read_cursor.revert_rows(unread)
+                            # Transição para o modo de tempo real se o lote vier incompleto
+                            sync_coordinator.switch_to_realtime()
                     else:
                         read_cursor.revert_rows(batch_size)
+                        # Se não houver dados, também tenta transicionar (caso a planilha esteja vazia)
+                        sync_coordinator.switch_to_realtime()
 
                     if not wait:
                         time.sleep(0.5)
@@ -278,4 +221,3 @@ def sheets_reading(
     finally:
         if radar_gui:
             radar_gui.close()
-

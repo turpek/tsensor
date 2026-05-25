@@ -1,6 +1,6 @@
 import threading
 from loguru import logger
-from tsensor.extensions import manager, config, setup_manager
+from tsensor.extensions import manager, config, setup_stream_manager
 from tsensor.core.serial_reader import sheets_reading, serial_reading
 
 # Controle global das threads
@@ -30,7 +30,7 @@ def start_acquisition():
             logger.warning("Monitoramento Sheets já está em execução.")
             return
 
-        setup_manager(config)
+        setup_stream_manager(config)
         hardware_config = config.get("hardware", {})
 
         def run_sheets():

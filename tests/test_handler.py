@@ -19,7 +19,9 @@ def test_handle_valid_unix_timestamp(timestamp_handler):
     from tsensor.core.handlers import sync_time
     sync_time.offset = 0.0  # Reseta para o teste não falhar por offset residual
     ts_str = "U=1714088826.873"
-    success = timestamp_handler.handle(ts_str)
+    
+    val = timestamp_handler.convert(ts_str)
+    success = timestamp_handler.update(str(val))
 
     assert success is True
     assert timestamp_handler.data.samples[0] == 1714088826.873
@@ -31,7 +33,8 @@ def test_handle_invalid_timestamp_falls_back_to_now(timestamp_handler, mocker):
     mock_now = 123456789.0
     mocker.patch("tsensor.core.handlers.time", return_value=mock_now)
 
-    success = timestamp_handler.handle("valor_invalido")
+    val = timestamp_handler.convert("valor_invalido")
+    success = timestamp_handler.update(str(val))
 
     assert success is True
     # O valor armazenado deve ser o valor retornado pelo time()
@@ -134,7 +137,8 @@ def test_stream_manager_dispatch_to_multiple_handlers(stream_manager):
     stream_manager.add_handler("s1", h1)
     stream_manager.add_handler("s2", h2)
 
-    stream_manager.dispatch("T=512")
+    # StreamManager.dispatch espera uma lista de valores já processados
+    stream_manager.dispatch(["25.5", "26.5"])
     assert len(d1) == 1
     assert len(d2) == 1
 
@@ -150,7 +154,8 @@ def test_stream_manager_dispatch_with_iterator(stream_manager):
     stream_manager.add_handler("s1", h1)
     stream_manager.add_handler("s2", h2)
 
-    data = ["10.5", "20.5"]
+    # SheetsHandler.update espera um iterador por valor
+    data = [iter(["10.5"]), iter(["20.5"])]
     stream_manager.dispatch(iter(data))
 
     assert len(d1) == 1
@@ -161,14 +166,11 @@ def test_stream_manager_dispatch_with_iterator(stream_manager):
 
 def test_sheets_handler_consumes_iterator(lm35_handler):
     """Verifica se o SheetsHandler consome corretamente um elemento do iterador."""
-    # Embora usemos lm35_handler (que é TemperatureHandler), o SheetsHandler é quem
-    # implementa a lógica de consumo de iterador no novo design do sistema.
-    # Mas como o usuário disse que TemperatureHandler continua Regex, vamos criar um SheetsHandler real.
     d, b, t = DataStream(10), DataStream(10), DataStream(10)
     handler = SheetsHandler(d, b, t, "Teste", 1023, 1.1)
 
     it = iter(["25.5", "ignored"])
-    success = handler.handle(it)
+    success = handler.update(it)
 
     assert success is True
     assert d.samples[0] == 25.5
@@ -228,7 +230,10 @@ def test_mps20_handle_valid_prefix(mps20_handler):
     """Verifica se o handler processa corretamente o prefixo P=."""
     # (5000000 - 4075138) * 0.001313 / 1000 = 1.214
     line = "P=5000000"
-    success = mps20_handler.handle(line)
+    
+    val = mps20_handler.convert(line)
+    success = mps20_handler.update(str(val))
+
     assert success is True
     assert len(mps20_handler.data) == 1
     assert mps20_handler.data.samples[0] == pytest.approx(1.214, abs=1e-2)
@@ -237,7 +242,12 @@ def test_mps20_handle_valid_prefix(mps20_handler):
 def test_mps20_handle_ignores_wrong_prefix(mps20_handler):
     """Garante que o handler de pressão ignora dados de temperatura (T=)."""
     line = "T=2500"
-    success = mps20_handler.handle(line)
+    
+    val = mps20_handler.convert(line)
+    success = False
+    if val != "":
+        success = mps20_handler.update(str(val))
+
     assert success is False
     assert len(mps20_handler.data) == 0
 

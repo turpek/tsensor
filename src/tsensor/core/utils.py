@@ -1,3 +1,4 @@
+from __future__ import annotations
 from datetime import datetime
 from math import ceil
 from time import time
@@ -10,6 +11,12 @@ import copy
 import json
 from urllib import request
 from loguru import logger
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from serial import Serial
+    from sheets import SheetsManager
 
 # Caminho absoluto para o arquivo de configuração
 CONFIG_PATH = os.path.join(os.getcwd(), "config.toml")
@@ -410,3 +417,43 @@ class TSSync:
 
     def get_real(self, ts: float) -> float:
         return ts + self._offset
+
+
+def att_latency(local_manager, app_status: dict):
+    # Calcula latência (baseada no último timestamp da tabela)
+    last_row = local_manager.table[-1]
+    if isinstance(last_row[0], (int, float)):
+        app_status["batch_latency"] = time() - last_row[0]
+
+
+def sheets_export(manager, sheet, cursor, sheets_lock, sync):
+    with sheets_lock:
+        actual_batch = len(manager.table)
+        num_handlers = len(manager)
+        # Janela Deslizante
+        sync.on_write_batch(sheet, actual_batch, sheets_lock)
+        logger.info(f"Exportando {actual_batch} linhas para o Sheets...")
+        cursor.major_row(actual_batch, num_handlers)
+
+        # Exporta usando ROWS (mais robusto para frequências variadas)
+        sheet.export(manager.table, cursor, major_mode='ROWS')
+
+
+def service_connection(
+    conn_cls: Serial | SheetsManager,
+    app_status: dict,
+    msg: str,
+    *args,
+    **kwargs
+) -> Serial | SheetsManager | None:
+    try:
+        service = conn_cls(*args, **kwargs)
+        app_status["connected"] = True
+        app_status["error"] = None
+        logger.info(msg)
+    except Exception as e:
+        app_status["connected"] = False
+        app_status["error"] = str(e)
+        logger.error(f"Erro ao tentar se conectar com {type(conn_cls).__name__}! erro {e}")
+        return None
+    return service

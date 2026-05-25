@@ -24,6 +24,7 @@ class SerialHandler(Protocol):
         time_series: DataStream,
         adc_max: int,
         v_ref: float,
+        name: str,
     ):
         ...
 
@@ -31,6 +32,10 @@ class SerialHandler(Protocol):
         ...
 
     def update(self, line: str | float) -> bool:
+        ...
+
+    @property
+    def name(self) -> str:
         ...
 
     @property
@@ -102,8 +107,9 @@ class PressureHandler(ABC):
         time_series: DataStream,
         adc_max: int,
         v_ref: float,
+        name: str,
         offset: float = 22.6,
-        sensitivity: float = 1.25
+        sensitivity: float = 1.25,
     ):
         self._data = data
         self._data_buffer = data_buffer
@@ -113,13 +119,18 @@ class PressureHandler(ABC):
         self._offset = offset
         self._sensitivity = sensitivity
         self._re = re.compile(f"P={REG_ADC_VALUE}")
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     def str_to_float(self, line: str) -> None | float:
         match = self._re.search(line)
         if match:
             return float(match.group(1))
         else:
-            logger.warning(
+            logger.debug(
                 f"Ruído ou padrão 'P=' não encontrado na linha: '{line}'")
         return None
 
@@ -164,6 +175,7 @@ class TemperatureHandler(ABC):
         time_series: DataStream,
         adc_max: int,
         v_ref: float,
+        name: str,
     ):
         self._data = data
         self._data_buffer = data_buffer
@@ -171,13 +183,18 @@ class TemperatureHandler(ABC):
         self._adc_max = adc_max
         self._v_ref = v_ref
         self._re = re.compile(f"T={REG_ADC_VALUE}")
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     def str_to_float(self, line: str) -> None | float:
         match = self._re.search(line)
         if match:
             return float(match.group(1))
         else:
-            logger.warning(
+            logger.debug(
                 f"Ruído ou padrão 'T=' não encontrado na linha: '{line}'")
         return None
 
@@ -256,6 +273,7 @@ class MPS20Handler(PressureHandler):
 class RadarDataHandler:
     def __init__(
         self,
+        name: str,
         data: Optional[DataStream] = None,
         data_buffer: Optional[DataStream] = None,
         time_series: Optional[DataStream] = None,
@@ -271,6 +289,11 @@ class RadarDataHandler:
         self.prefix = prefix
         self.value: int = 0
         self._re = re.compile(f"{prefix}={REG_ADC_VALUE}")
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     def str_to_float(self, line: str) -> None | float:
         match = self._re.search(line)
@@ -312,10 +335,10 @@ class RadarDataHandler:
 
 
 class RadarAngleHandler(RadarDataHandler):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, name: str, *args, **kwargs):
         if "prefix" not in kwargs:
             kwargs["prefix"] = "A"
-        super().__init__(*args, **kwargs)
+        super().__init__(name, *args, **kwargs)
 
     def _convert(self, adc: float):
         angle = float(adc)
@@ -324,10 +347,10 @@ class RadarAngleHandler(RadarDataHandler):
 
 
 class RadarDistanceHandler(RadarDataHandler):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, name: str, *args, **kwargs):
         if "prefix" not in kwargs:
             kwargs["prefix"] = "D"
-        super().__init__(*args, **kwargs)
+        super().__init__(name, *args, **kwargs)
 
     def _convert(self, adc: float):
         dist = float(adc)
@@ -359,6 +382,10 @@ class TimestampHandler:
         if match:
             return float(match.group(1))
         return None
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     def str_to_float(self, line: str) -> None | float:
         return self.convert_raw(line)
@@ -416,6 +443,14 @@ class StreamManager:
         self._total_samples = total_samples
         self._count = 0
 
+    @property
+    def total_samples(self) -> int:
+        return self._total_samples
+
+    @property
+    def handlers(self) -> dict:
+        return self._handlers
+
     def __len__(self) -> int:
         """Retorna a quantidade de handlers."""
         return len(self._handlers)
@@ -454,11 +489,6 @@ class StreamManager:
         # Se houver timeout, verifica o tempo decorrido
         if self._timeout is not None and (time() - self._start > self._timeout):
             return False
-
-        # Se houver limite de amostras, verifica a contagem
-        # if isinstance(self._total_samples, int) and self._count >= self._total_samples:
-        #     return False
-
         return self._active
 
 
@@ -469,13 +499,27 @@ class SerialManager:
         self._timeout: Optional[int] = None
         self._start: float = time()
         self._active: bool = False
+        self._total_samples = 1000
 
-    def configure(self, timeout: Optional[int] = None):
+    def configure(
+        self,
+        timeout: Optional[int] = None,
+        total_samples: Optional[int] = 1000,
+    ):
         self._timeout = timeout
         self._start = time()
         self._active = True
         self._handlers = {}
         self.table = []
+        self._total_samples = total_samples
+
+    @property
+    def total_samples(self) -> int:
+        return self._total_samples
+
+    @property
+    def handlers(self) -> dict:
+        return self._handlers
 
     def add_handler(self, name: str, handler: SerialHandler) -> None:
         self._handlers[name] = handler

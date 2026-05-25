@@ -1,3 +1,4 @@
+from __future__ import annotations
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -5,10 +6,12 @@ from googleapiclient.discovery import build
 from loguru import logger
 # from googleapiclient.errors import HttpError
 from tsensor.core.exporters import DataExporter
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 from pathlib import Path
 from queue import Queue, Empty
 
+if TYPE_CHECKING:
+    from tsensor.core.handlers import StreamManager, SerialManager
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SAMPLE_RANGE_NAME = "Página1!A1:B3"
@@ -111,7 +114,8 @@ class SheetsManager(DataExporter):
         self,
         credentials_path: str | Path = 'credentials.json',
         token_path: str | Path = 'token.json',
-        sheet: Any = None
+        sheet: Any = None,
+        *args, **kwargs
     ):
         self._service: Any = None
         self._sheet = sheet
@@ -401,3 +405,37 @@ class SyncCoordinator:
             return self._queue.get(timeout=timeout)
         except Empty:
             return False
+
+    def sync_cursors(self):
+        """Sincroniza o cursor de leitura com o de escrita para evitar dessincronia no modo tempo real."""
+        logger.info(
+            f"Sincronizando cursores: Read({self.read_cursor.row}) -> Write({self.write_cursor.row})")
+        self.read_cursor.clear(row=self.write_cursor.row)
+
+
+def get_header(sheet: SheetsManager, sheets_lock) -> list:
+    # Tenta descobrir o cabeçalho real da planilha
+    header_values = []
+    try:
+        from tsensor.core.sheets import SpreadSheetRange
+        header_range = SpreadSheetRange(row=1, col=1)
+        header_range.major_row(1, 26)
+        with sheets_lock:
+            res = sheet.fetch_data(header_range)
+        val_ranges = res.get('valueRanges', [])
+        header_values = val_ranges[0].get('values', [[]])[0] if val_ranges else []
+    except Exception:
+        logger.warning("Não foi possível ler o cabeçalho do Sheets. Usando config local.")
+    return header_values
+
+
+def export_header(
+    sheets: SheetsManager,
+    manager: SerialManager | StreamManager,
+    sheets_lock
+):
+    header = [handler.name for handler in manager.handlers.values()]
+    with sheets_lock:
+        header_cursor = SpreadSheetRange(row=1, col=1)
+        header_cursor.major_row(1, len(header))
+        sheets.export([header], header_cursor)

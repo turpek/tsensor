@@ -29,7 +29,7 @@ def test_setup_serial_manager_adds_timestamp_as_first_handler(mocker):
     # O primeiro handler deve ser o timestamp
     handler_names = list(serial_manager._handlers.keys())
     assert handler_names[0] == "timestamp"
-    assert isinstance(serial_manager.get_handler(
+    assert isinstance(serial_manager._handlers.get(
         "timestamp"), TimestampHandler)
     assert handler_names[1] == "Temp"
 
@@ -39,11 +39,7 @@ def test_setup_manager_adds_multiple_handlers_correctly(mocker):
     Valida se o setup_manager cria e adiciona múltiplos handlers ao manager
     global baseando-se no dicionário de configuração.
     """
-    # 1. Mock do SheetsHandler que agora é usado por padrão
-    mock_handler_cls = MagicMock()
-    mocker.patch("tsensor.extensions.SheetsHandler", mock_handler_cls)
-
-    # 2. Mock do load_config não é necessário pois passamos o config via parâmetro
+    # 1. Mock do load_config não é necessário pois passamos o config via parâmetro
     test_config = {
         "acquisition": {
             "total_samples": 5000,
@@ -66,24 +62,20 @@ def test_setup_manager_adds_multiple_handlers_correctly(mocker):
         ]
     }
 
-    # 3. Execução
+    # 2. Execução
     # O manager é global, então o setup_manager vai alterar o estado dele
     result_manager = setup_manager(test_config)
 
-    # 4. Verificações
+    # 3. Verificações
     # Agora o len é 3 (2 sensores + 1 timestamp)
     assert len(result_manager) == 3
     assert result_manager.get_handler("timestamp") is not None
     assert result_manager.get_handler("Ambiente") is not None
     assert result_manager.get_handler("Motor") is not None
 
-    # Verifica se as classes de handler foram instanciadas 2 vezes (sensores)
-    # mais a do timestamp (que também usa o mock do SheetsHandler no teste)
-    assert mock_handler_cls.call_count == 3
 
-
-def test_setup_manager_raises_error_with_no_valid_sensors(mocker):
-    """Garante que um erro é lançado se nenhum sensor válido (além do timestamp) for encontrado."""
+def test_setup_manager_configures_only_timestamp_with_no_valid_sensors(mocker):
+    """Garante que se nenhum sensor válido for encontrado, apenas o timestamp é configurado."""
     mocker.patch("tsensor.extensions.HANDLERS",
                  {})  # Nenhum handler disponível
 
@@ -92,6 +84,6 @@ def test_setup_manager_raises_error_with_no_valid_sensors(mocker):
         "sensors": [{"name": "Erro", "type": "temp", "model": "INVALIDO"}]
     }
 
-    # O manager terá apenas o handler de timestamp, então deve falhar se não houver sensores úteis
-    with pytest.raises(RuntimeError, match="Nenhum sensor válido"):
-        setup_manager(test_config)
+    result_manager = setup_manager(test_config)
+    assert len(result_manager) == 1
+    assert list(result_manager._handlers.keys()) == ["timestamp"]

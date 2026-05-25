@@ -7,18 +7,18 @@ from serial import Serial as _RealSerial, SerialException
 # Tabela de referência: (mcu, vref) -> targets de ADC
 SIM_DATA = {
     ("esp32", 3.3): {
-        "P": 93556,
+        "P": 4455945,  # ~0.5 kPa
         "LM35": 310,
         "NTC": 2047,
         "sigma_t": 2,
-        "sigma_p": 150
+        "sigma_p": 5000  # ~0.006 kPa fluctuation
     },
     ("arduino_uno", 5.0): {
-        "P": 93556,
+        "P": 5598367,  # ~2.0 kPa
         "LM35": 51,
         "NTC": 511,
         "sigma_t": 1,
-        "sigma_p": 300
+        "sigma_p": 15000  # ~0.02 kPa fluctuation
     },
     ("arduino_uno", 1.1): {
         "P": 16777215,  # Saturado
